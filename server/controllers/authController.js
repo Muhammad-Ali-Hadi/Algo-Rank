@@ -1,20 +1,19 @@
-const { createClient } = require('@supabase/supabase-js');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { supabaseAdmin } = require('../services/supabaseClient');
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const JWT_SECRET = process.env.JWT_SECRET || 'algorank-secret-key';
 
-// Always use service role for admin operations
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+// Generate JWT token for a user
+function generateToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, username: user.username },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+}
 
-// Regular client for auth operations
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
+// ==================== SIGNUP ====================
 const signup = async (req, res) => {
   const { email, password, username, name } = req.body;
 
@@ -23,81 +22,71 @@ const signup = async (req, res) => {
   }
 
   try {
-    // Step 1: Check if username already exists
-    const { data: existingUser } = await supabaseAdmin
+    // Check if email already exists
+    const { data: emailExists } = await supabaseAdmin
       .from('users')
-      .select('username')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (emailExists) {
+      return res.status(400).json({ error: 'Email is already registered' });
+    }
+
+    // Check if username already exists
+    const { data: usernameExists } = await supabaseAdmin
+      .from('users')
+      .select('id')
       .eq('username', username.toLowerCase())
       .single();
 
-    if (existingUser) {
-      return res.status(400).json({ error: 'Username already taken' });
+    if (usernameExists) {
+      return res.status(400).json({ error: 'Username is already taken' });
     }
 
-    // Step 2: Create auth user using admin API (bypasses email confirmation)
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // auto-confirm, no email sent
-      user_metadata: {
-        name,
-        username: username.toLowerCase(),
-        password, // plain text stored in public.users via trigger
-        avatar_url: ''
-      }
-    });
-
-    if (authError) {
-      console.error('Auth error:', authError);
-      return res.status(400).json({ error: authError.message });
-    }
-
-    // Step 3: Manually insert into public.users as backup
-    // (in case the trigger didn't fire)
-    const { error: insertError } = await supabaseAdmin
+    // Insert directly into public.users
+    const userId = crypto.randomUUID();
+    const { data: newUser, error: insertError } = await supabaseAdmin
       .from('users')
-      .upsert({
-        id: authData.user.id,
-        email,
+      .insert({
+        id: userId,
+        email: email.toLowerCase(),
         username: username.toLowerCase(),
-        password,
-        name,
+        password: password,
+        name: name,
         avatar_url: ''
-      }, { onConflict: 'id' });
+      })
+      .select()
+      .single();
 
     if (insertError) {
       console.error('Insert error:', insertError);
-      // Don't fail — auth user was created, just log
+      return res.status(500).json({ error: 'Failed to create account: ' + insertError.message });
     }
 
-    // Step 4: Sign in immediately to get session
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    // Generate JWT
+    const token = generateToken(newUser);
 
-    if (signInError) {
-      console.error('Sign in error:', signInError);
-      return res.status(400).json({ error: signInError.message });
-    }
-
-    return res.status(200).json({
-      message: 'Signup successful',
-      session: signInData.session,
+    return res.status(201).json({
+      message: 'Account created successfully',
+      token,
       user: {
-        id: authData.user.id,
-        email,
-        username: username.toLowerCase(),
-        name
+        id: newUser.id,
+        email: newUser.email,
+        username: newUser.username,
+        name: newUser.name,
+        avatar_url: newUser.avatar_url,
+        created_at: newUser.created_at
       }
     });
 
   } catch (err) {
     console.error('Signup exception:', err);
-    return res.status(500).json({ error: 'Internal server error: ' + err.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+// ==================== SIGNIN ====================
 const signin = async (req, res) => {
   const { identifier, password } = req.body;
 
@@ -106,52 +95,56 @@ const signin = async (req, res) => {
   }
 
   try {
-    let email = identifier;
-
-    // If identifier is a username (no @), look up the email
-    if (!identifier.includes('@')) {
-      const { data: userData, error: lookupError } = await supabaseAdmin
+    // Look up user by email or username
+    let query;
+    if (identifier.includes('@')) {
+      query = supabaseAdmin
         .from('users')
-        .select('email')
+        .select('*')
+        .eq('email', identifier.toLowerCase())
+        .single();
+    } else {
+      query = supabaseAdmin
+        .from('users')
+        .select('*')
         .eq('username', identifier.toLowerCase())
         .single();
-
-      if (lookupError || !userData) {
-        return res.status(400).json({ error: 'Username not found' });
-      }
-
-      email = userData.email;
     }
 
-    // Sign in with email + password
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    const { data: user, error: lookupError } = await query;
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
+    if (lookupError || !user) {
+      return res.status(401).json({ error: 'Invalid username/email or password' });
     }
 
-    // Fetch full user profile
-    const { data: profile } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
+    // Check password (direct comparison)
+    if (user.password !== password) {
+      return res.status(401).json({ error: 'Invalid username/email or password' });
+    }
+
+    // Generate JWT
+    const token = generateToken(user);
 
     return res.status(200).json({
       message: 'Login successful',
-      session: data.session,
-      user: profile || data.user
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        name: user.name,
+        avatar_url: user.avatar_url,
+        created_at: user.created_at
+      }
     });
 
   } catch (err) {
     console.error('Signin exception:', err);
-    return res.status(500).json({ error: 'Internal server error: ' + err.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+// ==================== GET PROFILE ====================
 const getProfile = async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
@@ -160,7 +153,9 @@ const getProfile = async (req, res) => {
       .eq('id', req.user.id)
       .single();
 
-    if (error) throw error;
+    if (error || !data) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
     return res.status(200).json({ user: data });
   } catch (err) {

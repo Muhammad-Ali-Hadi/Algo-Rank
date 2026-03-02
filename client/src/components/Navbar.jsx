@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import Logo from './Logo';
 
 export default function Navbar() {
-  const { profile, signOut } = useAuth();
+  const { user: profile, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleSignOut = async () => {

@@ -1,9 +1,9 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : 'http://localhost:5000/api';
 
 async function fetchWithAuth(endpoint, options = {}) {
-  const token = (await import('./supabaseClient')).supabase.auth
-    ? localStorage.getItem('sb-access-token')
-    : null;
+  const token = localStorage.getItem('token');
 
   const headers = {
     'Content-Type': 'application/json',

@@ -1,67 +1,37 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../services/supabaseClient';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser]       = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
+  const [error, setError] = useState(null);
 
+  // On mount, restore user from localStorage token
   useEffect(() => {
-    // Restore session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setUser(null);
-          setLoading(false);
-        }
+    if (token && savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
       }
-    );
-
-    return () => subscription.unsubscribe();
+    }
+    setLoading(false);
   }, []);
 
-  const fetchProfile = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-      setUser(data);
-    } catch (err) {
-      console.error('fetchProfile error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const signUp = async (email, password, username, name) => {
-    setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/signup`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, username, name })
-        }
-      );
+      const res = await fetch(`${API_URL}/api/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, username, name }),
+      });
 
       const data = await res.json();
 
@@ -69,33 +39,25 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.error || 'Signup failed');
       }
 
-      // Set session in supabase client
-      if (data.session) {
-        await supabase.auth.setSession(data.session);
-      }
-
-      setUser(data.user);
+      // Store token and user in localStorage but DON'T set user state yet
+      // This allows LoginCard to show a success popup before redirecting
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
       return { data, error: null };
     } catch (err) {
       setError(err.message);
       return { data: null, error: err.message };
-    } finally {
-      setLoading(false);
     }
   };
 
   const signIn = async (identifier, password) => {
-    setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/signin`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier, password })
-        }
-      );
+      const res = await fetch(`${API_URL}/api/auth/signin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, password }),
+      });
 
       const data = await res.json();
 
@@ -103,28 +65,36 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Set session in supabase client
-      if (data.session) {
-        await supabase.auth.setSession(data.session);
-      }
-
-      setUser(data.user);
+      // Store token and user in localStorage but DON'T set user state yet
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
       return { data, error: null };
     } catch (err) {
       setError(err.message);
       return { data: null, error: err.message };
-    } finally {
-      setLoading(false);
     }
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  // Call this after showing success popup to trigger the redirect
+  const commitAuth = () => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const signOut = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, error, signUp, signIn, signOut, commitAuth }}>
       {children}
     </AuthContext.Provider>
   );

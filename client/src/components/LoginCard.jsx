@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import Logo from "./Logo";
 
 export default function LoginCard() {
-  const { signIn, signUp, supabase } = useAuth();
+  const { signIn, signUp, commitAuth } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -12,6 +12,11 @@ export default function LoginCard() {
   const [validationPopup, setValidationPopup] = useState({
     show: false,
     message: "",
+  });
+  const [successPopup, setSuccessPopup] = useState({
+    show: false,
+    message: "",
+    icon: "check",
   });
 
   // Form state
@@ -139,73 +144,55 @@ export default function LoginCard() {
       try {
         setLoading(true);
 
-        // Check if username is already taken
-        const { data: existing } = await supabase
-          .from("users")
-          .select("username")
-          .eq("username", username)
-          .single();
-
-        if (existing) {
-          setError("Username is already taken.");
+        const result = await signUp(email, password, username, name);
+        if (result.error) {
+          setValidationPopup({
+            show: true,
+            message: result.error,
+          });
           setLoading(false);
           return;
         }
-
-        const data = await signUp(email, password, name, username);
-        // signUp now auto signs-in, so redirect happens automatically via auth listener
+        // Show success popup — will redirect after a short delay
+        setSuccessPopup({
+          show: true,
+          message: "Account created successfully!\nWelcome to AlgoRank, " + (name.split(' ')[0] || 'Coder') + "!",
+          icon: "signup",
+        });
+        // Redirect after 2 seconds
+        setTimeout(() => commitAuth(), 2000);
       } catch (err) {
-        setError(err?.message || "Sign-up failed. Please try again.");
+        setValidationPopup({
+          show: true,
+          message: err?.message || "Sign-up failed. Please try again.",
+        });
       } finally {
         setLoading(false);
       }
     } else {
-      // Validation for sign-in
+      // Sign-in: only check fields are not empty
       if (!loginId.trim() || !password.trim()) {
-        setError("Username/email and password are required.");
-        return;
-      }
-
-      // Collect all validation errors
-      const errors = [];
-
-      // Regex validation for email if loginId contains @
-      if (loginId.includes("@")) {
-        if (!emailRegex.test(loginId.trim())) {
-          errors.push(
-            "• Invalid email format. No spaces or invalid special characters allowed.",
-          );
-        }
-      }
-
-      // Regex validation for password (minimum 8 characters, at least 2 digits, no spaces)
-      if (password.length < 8) {
-        errors.push("• Password must be at least 8 characters long.");
-      }
-
-      if (!passwordRegex.test(password)) {
-        errors.push(
-          "• Password must contain at least 2 numeric digits and no spaces.",
-        );
-      }
-
-      // If there are validation errors, show them all
-      if (errors.length > 0) {
-        setValidationPopup({
-          show: true,
-          message: errors.join("\n"),
-        });
+        setError("Please enter your username/email and password.");
         return;
       }
 
       try {
         setLoading(true);
-        await signIn(loginId, password);
-      } catch (err) {
-        setValidationPopup({
+        const result = await signIn(loginId, password);
+        if (result.error) {
+          setError("Incorrect username or password. Please try again.");
+          return;
+        }
+        // Show success popup — will redirect after short delay
+        setSuccessPopup({
           show: true,
-          message: "Username or password is not correct",
+          message: "Login Successful!\nWelcome back, " + (result.data?.user?.name?.split(' ')[0] || 'Coder') + "!",
+          icon: "login",
         });
+        // Redirect after 2 seconds
+        setTimeout(() => commitAuth(), 2000);
+      } catch (err) {
+        setError("Incorrect username or password. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -263,10 +250,93 @@ export default function LoginCard() {
                 </svg>
               </button>
 
+              {/* Error Icon */}
+              <div className="flex justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+              </div>
+
               {/* Message */}
               <p className="text-center text-foreground text-sm font-medium whitespace-pre-line">
                 {validationPopup.message}
               </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Popup */}
+      <AnimatePresence>
+        {successPopup.show && (
+          <motion.div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div
+              className="relative bg-surface border border-primary/30 rounded-2xl p-8 max-w-sm mx-4 shadow-2xl"
+              style={{ boxShadow: '0 0 60px rgba(99,102,241,0.15), 0 25px 50px rgba(0,0,0,0.5)' }}
+              initial={{ opacity: 0, scale: 0.8, y: -30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 30 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Animated checkmark circle */}
+              <div className="flex justify-center mb-5">
+                <motion.div
+                  className="w-16 h-16 rounded-full bg-gradient-to-br from-green-500/20 to-primary/20 border-2 border-green-400/40 flex items-center justify-center"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 15 }}
+                >
+                  <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {successPopup.icon === "signup" ? (
+                      <motion.path
+                        strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 1 }}
+                        transition={{ delay: 0.4, duration: 0.5, ease: "easeOut" }}
+                      />
+                    ) : (
+                      <motion.path
+                        strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                        d="M5 13l4 4L19 7"
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 1 }}
+                        transition={{ delay: 0.4, duration: 0.5, ease: "easeOut" }}
+                      />
+                    )}
+                  </svg>
+                </motion.div>
+              </div>
+
+              {/* Success message */}
+              <motion.p
+                className="text-center text-foreground text-base font-semibold whitespace-pre-line mb-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.3 }}
+              >
+                {successPopup.message}
+              </motion.p>
+
+              {/* Redirecting indicator */}
+              <motion.div
+                className="flex items-center justify-center gap-2 mt-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+              >
+                <div className="w-3 h-3 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+                <span className="text-xs text-muted">Redirecting to dashboard...</span>
+              </motion.div>
             </motion.div>
           </motion.div>
         )}
@@ -449,7 +519,7 @@ export default function LoginCard() {
               <input
                 type="text"
                 value={loginId}
-                onChange={(e) => setLoginId(e.target.value)}
+                onChange={(e) => { setLoginId(e.target.value); setError(null); }}
                 placeholder="algo_master or you@example.com"
                 className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-border
                            text-foreground placeholder:text-muted/40 text-sm
@@ -469,7 +539,7 @@ export default function LoginCard() {
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); if (!isSignUp) setError(null); }}
                 placeholder="••••••••"
                 className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-border
                            text-foreground placeholder:text-muted/40 text-sm
@@ -556,17 +626,25 @@ export default function LoginCard() {
             )}
           </div>
 
-          {/* Error */}
+          {/* Inline Error */}
           <AnimatePresence>
             {error && (
-              <motion.p
-                className="text-red-400 text-sm text-center bg-red-400/5 rounded-lg py-2 px-3"
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
+              <motion.div
+                key="error-banner"
+                className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3"
+                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               >
-                {error}
-              </motion.p>
+                <div className="shrink-0 w-8 h-8 rounded-full bg-red-500/15 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <p className="text-red-400 text-sm font-medium">{error}</p>
+              </motion.div>
             )}
           </AnimatePresence>
 
