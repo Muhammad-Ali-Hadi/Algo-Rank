@@ -41,7 +41,7 @@ export default function LoginCard() {
   // Validation helper functions for real-time feedback
   const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const passwordRegex = /^(?=.*\d.*\d)[^\s]+$/;
-
+// validate email, password, and username with detailed checks for real-time feedback
   const validateEmail = (emailValue) => {
     return {
       isValid: emailRegex.test(emailValue.trim()),
