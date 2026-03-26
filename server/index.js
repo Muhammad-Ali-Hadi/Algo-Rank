@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const authRoutes = require('./routes/authRoutes');
+const passwordRoutes = require('./routes/passwordRoutes'); // NEW: password reset routes
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
@@ -20,6 +21,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/password', passwordRoutes); // NEW: forgot password / OTP / reset
 
 // Error handling
 app.use(notFound);

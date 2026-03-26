@@ -47,8 +47,13 @@ export default function Navbar() {
                       {profile.name?.charAt(0) || 'U'}
                     </div>
                   )}
-                  <span className="hidden sm:block text-sm text-foreground font-medium">
+                  <span className="hidden sm:flex items-center gap-2 text-sm text-foreground font-medium">
                     {profile.name || 'User'}
+                    {profile.isAdmin && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider">
+                        Admin
+                      </span>
+                    )}
                   </span>
                   <svg
                     className={`w-4 h-4 text-muted transition-transform ${menuOpen ? 'rotate-180' : ''}`}
@@ -69,8 +74,13 @@ export default function Navbar() {
                     transition={{ duration: 0.15 }}
                   >
                     <div className="px-4 py-3 border-b border-border">
-                      <p className="text-sm font-medium text-foreground truncate">
+                      <p className="text-sm font-medium text-foreground truncate flex items-center gap-2">
                         {profile.name}
+                        {profile.isAdmin && (
+                          <svg className="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-2.33v8.02z"/>
+                          </svg>
+                        )}
                       </p>
                       <p className="text-xs text-muted truncate">{profile.email}</p>
                     </div>
