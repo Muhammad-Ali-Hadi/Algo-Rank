@@ -4,8 +4,11 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const authRoutes = require('./routes/authRoutes');
-const passwordRoutes = require('./routes/passwordRoutes'); // NEW: password reset routes
+const passwordRoutes = require('./routes/passwordRoutes');
+const contestRoutes = require('./routes/contestRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
+const { generalLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,11 +20,16 @@ app.use(cors({
   credentials: true,
 }));
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json({ limit: '2mb' })); // Increased for avatar base64
+
+// Global rate limiter
+app.use(generalLimiter);
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/password', passwordRoutes); // NEW: forgot password / OTP / reset
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/password', authLimiter, passwordRoutes);
+app.use('/api/contests', contestRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Error handling
 app.use(notFound);

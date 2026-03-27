@@ -1,0 +1,372 @@
+/* ============================================
+   Neon Theme — Enhanced Blue + Black
+   Scoped under .neon-theme (post-login only)
+   ============================================ */
+
+/* ---- Neon Keyframes ---- */
+@keyframes neonPulse {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(88, 166, 255, 0.3),
+                0 0 10px rgba(88, 166, 255, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(88, 166, 255, 0.5),
+                0 0 24px rgba(88, 166, 255, 0.25);
+  }
+}
+
+@keyframes neonBorderGlow {
+  0%, 100% {
+    border-color: rgba(88, 166, 255, 0.4);
+  }
+  50% {
+    border-color: rgba(88, 166, 255, 0.8);
+  }
+}
+
+@keyframes neonTextGlow {
+  0%, 100% {
+    text-shadow: 0 0 4px rgba(88, 166, 255, 0.4);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(88, 166, 255, 0.7),
+                 0 0 24px rgba(88, 166, 255, 0.3);
+  }
+}
+
+/* ---- Base Neon Theme ---- */
+.neon-theme {
+  background: #000000;
+  color: #E5E7EB;
+  min-height: 100vh;
+}
+
+/* ---- Neon Cards ---- */
+.neon-theme .neon-card {
+  background: rgba(10, 10, 10, 0.85);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  border-radius: 12px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all 0.3s ease;
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.08),
+              0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.neon-theme .neon-card:hover {
+  border-color: rgba(88, 166, 255, 0.6);
+  box-shadow: 0 0 15px rgba(88, 166, 255, 0.2),
+              0 0 30px rgba(88, 166, 255, 0.08),
+              0 8px 32px rgba(0, 0, 0, 0.5);
+  transform: translateY(-2px);
+}
+
+/* ---- Neon Buttons ---- */
+.neon-theme .neon-btn {
+  background: linear-gradient(135deg, rgba(31, 111, 235, 0.2), rgba(88, 166, 255, 0.1));
+  color: #58A6FF;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.neon-theme .neon-btn:hover {
+  background: linear-gradient(135deg, rgba(31, 111, 235, 0.35), rgba(88, 166, 255, 0.2));
+  border-color: rgba(88, 166, 255, 0.7);
+  box-shadow: 0 0 15px rgba(88, 166, 255, 0.3),
+              0 0 30px rgba(88, 166, 255, 0.1);
+  color: #79C0FF;
+  transform: translateY(-1px);
+}
+
+.neon-theme .neon-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.2);
+}
+
+.neon-theme .neon-btn-primary {
+  background: linear-gradient(135deg, #1F6FEB, #58A6FF);
+  color: #FFFFFF;
+  border: 1px solid rgba(88, 166, 255, 0.5);
+  box-shadow: 0 0 12px rgba(88, 166, 255, 0.25);
+}
+
+.neon-theme .neon-btn-primary:hover {
+  background: linear-gradient(135deg, #2980f5, #6cb5ff);
+  box-shadow: 0 0 20px rgba(88, 166, 255, 0.4),
+              0 0 40px rgba(88, 166, 255, 0.15);
+  border-color: rgba(121, 192, 255, 0.7);
+}
+
+.neon-theme .neon-btn-danger {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.neon-theme .neon-btn-danger:hover {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+}
+
+/* ---- Neon Inputs ---- */
+.neon-theme .neon-input {
+  background: rgba(10, 10, 10, 0.9);
+  border: 1px solid rgba(88, 166, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #E5E7EB;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  outline: none;
+  width: 100%;
+}
+
+.neon-theme .neon-input:focus {
+  border-color: rgba(88, 166, 255, 0.6);
+  box-shadow: 0 0 10px rgba(88, 166, 255, 0.15),
+              0 0 20px rgba(88, 166, 255, 0.05);
+}
+
+.neon-theme .neon-input::placeholder {
+  color: #6B7280;
+}
+
+.neon-theme .neon-textarea {
+  background: rgba(10, 10, 10, 0.9);
+  border: 1px solid rgba(88, 166, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #E5E7EB;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  outline: none;
+  width: 100%;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.neon-theme .neon-textarea:focus {
+  border-color: rgba(88, 166, 255, 0.6);
+  box-shadow: 0 0 10px rgba(88, 166, 255, 0.15),
+              0 0 20px rgba(88, 166, 255, 0.05);
+}
+
+/* ---- Neon Select ---- */
+.neon-theme .neon-select {
+  background: rgba(10, 10, 10, 0.9);
+  border: 1px solid rgba(88, 166, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #E5E7EB;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+}
+
+.neon-theme .neon-select:focus {
+  border-color: rgba(88, 166, 255, 0.6);
+  box-shadow: 0 0 10px rgba(88, 166, 255, 0.15);
+}
+
+/* ---- Neon Labels ---- */
+.neon-theme .neon-label {
+  color: #9CA3AF;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* ---- Neon Badge ---- */
+.neon-theme .neon-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.neon-theme .neon-badge-blue {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58A6FF;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+.neon-theme .neon-badge-green {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.neon-theme .neon-badge-yellow {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.neon-theme .neon-badge-red {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.neon-theme .neon-badge-purple {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+/* ---- Neon Divider ---- */
+.neon-theme .neon-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(88, 166, 255, 0.3), transparent);
+  border: none;
+  margin: 16px 0;
+}
+
+/* ---- Neon Glow Text ---- */
+.neon-theme .neon-glow-text {
+  color: #58A6FF;
+  text-shadow: 0 0 8px rgba(88, 166, 255, 0.4);
+}
+
+/* ---- Neon Tab ---- */
+.neon-theme .neon-tab {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #6B7280;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.neon-theme .neon-tab:hover {
+  color: #9CA3AF;
+  background: rgba(88, 166, 255, 0.05);
+}
+
+.neon-theme .neon-tab-active {
+  color: #58A6FF;
+  background: rgba(88, 166, 255, 0.1);
+  border-color: rgba(88, 166, 255, 0.3);
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.1);
+}
+
+/* ---- Neon Navbar Enhancement ---- */
+.neon-theme .neon-nav-link {
+  color: #9CA3AF;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.neon-theme .neon-nav-link:hover {
+  color: #58A6FF;
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.neon-theme .neon-nav-link-active {
+  color: #58A6FF;
+  background: rgba(88, 166, 255, 0.12);
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.1);
+}
+
+/* ---- Neon Animated Glow Border (PS5 Style) ---- */
+@keyframes neonRotate {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.neon-theme .neon-glow-border {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  background: rgba(10, 10, 10, 0.85); /* Ensure solid background to block glow inner */
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  border-radius: 12px;
+}
+
+.neon-theme .neon-glow-border::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    transparent, 
+    transparent, 
+    transparent, 
+    rgb(31, 111, 235), 
+    rgb(88, 166, 255), 
+    rgb(255, 255, 255),
+    rgb(88, 166, 255),
+    rgb(31, 111, 235),
+    transparent,
+    transparent,
+    transparent
+  );
+  animation: neonRotate 4s linear infinite;
+  z-index: 0;
+}
+
+.neon-theme .neon-glow-border::after {
+  content: '';
+  position: absolute;
+  inset: 2px; /* Border thickness */
+  background: rgba(10, 10, 10, 0.95);
+  border-radius: 10px; /* Adjust for inset */
+  z-index: 0;
+}
+
+.neon-theme .neon-glow-border > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- Neon Background Accent ---- */
+.neon-theme .neon-bg-glow {
+  position: fixed;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(31, 111, 235, 0.08), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ---- Neon Empty State ---- */
+.neon-theme .neon-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: #6B7280;
+}
+
+.neon-theme .neon-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
