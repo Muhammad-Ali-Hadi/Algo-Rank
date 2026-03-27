@@ -395,7 +395,12 @@ export default function ContestDetailPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0 }}
             >
-              <LeaderboardSection contestId={id} isCreator={isCreatorOrAdmin} />
+              <LeaderboardSection 
+                contestId={id} 
+                isCreator={isCreatorOrAdmin} 
+                isParticipant={isParticipant}
+                problemsCount={problems.length}
+              />
             </motion.div>
           )}
         </div>

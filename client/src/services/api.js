@@ -2,8 +2,19 @@ const API_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : 'http://localhost:5000/api';
 
+const cache = new Map();
+
 async function fetchWithAuth(endpoint, options = {}) {
   const token = localStorage.getItem('token');
+  const isGet = !options.method || options.method === 'GET';
+
+  // Return cached data if valid (5 seconds TTL)
+  if (isGet) {
+    const cached = cache.get(endpoint);
+    if (cached && Date.now() - cached.timestamp < 5000) {
+      return cached.data;
+    }
+  }
 
   const headers = {
     'Content-Type': 'application/json',
@@ -21,7 +32,13 @@ async function fetchWithAuth(endpoint, options = {}) {
     throw new Error(error.error || 'Request failed');
   }
 
-  return response.json();
+  const data = await response.json();
+  
+  if (isGet) {
+    cache.set(endpoint, { timestamp: Date.now(), data });
+  }
+  
+  return data;
 }
 
 export const api = {

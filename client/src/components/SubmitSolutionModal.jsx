@@ -9,7 +9,7 @@ export default function SubmitSolutionModal({ isOpen, onClose, contestId, proble
   const [solutionUrl, setSolutionUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const label = String.fromCharCode(65 + problemIndex);
 
   const handleSubmit = async (e) => {
@@ -33,7 +33,7 @@ export default function SubmitSolutionModal({ isOpen, onClose, contestId, proble
         code_text: submissionType === 'code' ? code : '',
         solution_url: submissionType === 'url' ? solutionUrl : '',
       });
-      
+
       onSubmitted();
       onClose();
       setCode('');
@@ -57,7 +57,7 @@ export default function SubmitSolutionModal({ isOpen, onClose, contestId, proble
           exit={{ opacity: 0 }}
           onClick={onClose}
         />
-        
+
         <motion.div
           className="relative w-full max-w-3xl flex flex-col glass-strong neon-glow-border rounded-xl shadow-2xl overflow-hidden"
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -92,7 +92,7 @@ export default function SubmitSolutionModal({ isOpen, onClose, contestId, proble
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="neon-label">Language</label>
-                <select 
+                <select
                   className="neon-select"
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
@@ -103,18 +103,18 @@ export default function SubmitSolutionModal({ isOpen, onClose, contestId, proble
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="neon-label">Submission Method</label>
                 <div className="flex gap-2">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setSubmissionType('code')}
                     className={`flex-1 py-2 px-3 text-sm rounded border ${submissionType === 'code' ? 'bg-primary/20 border-primary text-primary' : 'bg-black/30 border-white/10 text-muted hover:bg-white/5'}`}
                   >
                     Paste Code
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setSubmissionType('url')}
                     className={`flex-1 py-2 px-3 text-sm rounded border ${submissionType === 'url' ? 'bg-primary/20 border-primary text-primary' : 'bg-black/30 border-white/10 text-muted hover:bg-white/5'}`}
@@ -159,8 +159,8 @@ export default function SubmitSolutionModal({ isOpen, onClose, contestId, proble
               <button type="button" onClick={onClose} className="neon-btn">
                 Cancel
               </button>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={loading}
                 className="neon-btn neon-btn-primary min-w-[120px]"
               >

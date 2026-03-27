@@ -37,3 +37,77 @@ alter table public.users disable row level security;
 grant all on public.users to service_role;
 grant select on public.users to anon;
 grant select on public.users to authenticated;
+
+-- ============================================
+-- Contest System Tables (Sprint 2)
+-- ============================================
+
+-- Contests table
+create table if not exists public.contests (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text default '',
+  type text not null check (type in ('global', 'local')),
+  visibility text not null default 'public' check (visibility in ('public', 'private')),
+  start_time timestamp with time zone not null,
+  end_time timestamp with time zone,
+  duration_seconds integer,
+  creator_id uuid not null references public.users(id) on delete cascade,
+  invite_code text unique,
+  freeze_time timestamp with time zone,
+  created_at timestamp with time zone default now()
+);
+
+-- Contest problems table
+create table if not exists public.contest_problems (
+  id uuid primary key default gen_random_uuid(),
+  contest_id uuid not null references public.contests(id) on delete cascade,
+  problem_title text not null,
+  problem_url text default '',
+  order_index integer default 0,
+  scraped_content text,
+  scraped_samples jsonb,
+  scraped_at timestamp with time zone
+);
+
+-- Contest participants table
+create table if not exists public.contest_participants (
+  id uuid primary key default gen_random_uuid(),
+  contest_id uuid not null references public.contests(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  joined_at timestamp with time zone default now(),
+  unique(contest_id, user_id)
+);
+
+-- Submissions table
+create table if not exists public.submissions (
+  id uuid primary key default gen_random_uuid(),
+  contest_id uuid not null references public.contests(id) on delete cascade,
+  problem_id uuid not null references public.contest_problems(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  language text not null,
+  code_text text default '',
+  solution_url text default '',
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'wrong_answer', 'time_limit', 'runtime_error', 'compile_error')),
+  submitted_at timestamp with time zone default now()
+);
+
+-- Disable RLS for contest tables (backend uses service_role key)
+alter table public.contests disable row level security;
+alter table public.contest_problems disable row level security;
+alter table public.contest_participants disable row level security;
+alter table public.submissions disable row level security;
+
+-- Grant access
+grant all on public.contests to service_role;
+grant all on public.contest_problems to service_role;
+grant all on public.contest_participants to service_role;
+grant all on public.submissions to service_role;
+grant select on public.contests to anon;
+grant select on public.contest_problems to anon;
+grant select on public.contest_participants to anon;
+grant select on public.submissions to anon;
+grant select on public.contests to authenticated;
+grant select on public.contest_problems to authenticated;
+grant select on public.contest_participants to authenticated;
+grant select on public.submissions to authenticated;

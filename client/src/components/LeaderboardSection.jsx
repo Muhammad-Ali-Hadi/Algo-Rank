@@ -129,21 +129,40 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                   
                   {problemLetters.map((_, i) => {
                     const status = row.problems[`p${i}`];
+                    if (!status) {
+                      return <td key={i} className="px-4 py-3 text-center border-l border-white/5"><span className="text-muted/30">-</span></td>;
+                    }
+
+                    let bgClass = '';
+                    let content = null;
+
+                    if (status.status === 'accepted') {
+                      bgClass = status.isFirstBlood ? 'bg-green-600/80 font-bold text-white shadow-[inset_0_0_10px_rgba(34,197,94,0.5)]' : 'bg-green-500/20 text-green-400';
+                      content = (
+                        <div className="leading-tight flex flex-col items-center justify-center">
+                          <span className="text-sm">{status.attempts > 1 ? `+${status.attempts - 1}` : '+'}</span>
+                          <span className="text-[10px] opacity-80">{status.solveTime}m</span>
+                        </div>
+                      );
+                    } else if (status.status === 'frozen') {
+                      bgClass = 'bg-blue-500/30 text-blue-300 border border-blue-500/30';
+                      content = (
+                        <div className="leading-tight tooltip hover:cursor-help" title={`Frozen after ${status.attempts} attempts`}>
+                          <span className="text-sm">?</span>
+                          {status.attempts > 0 && <span className="text-[10px] block opacity-80">+{status.attempts}</span>}
+                        </div>
+                      );
+                    } else if (status.status === 'pending') {
+                      bgClass = 'bg-yellow-500/20 text-yellow-400';
+                      content = <span className="text-xs">Pending</span>;
+                    } else {
+                      bgClass = 'bg-red-500/20 text-red-400';
+                      content = <span className="text-sm">-{status.attempts}</span>;
+                    }
+
                     return (
-                      <td key={i} className="px-4 py-3 text-center">
-                        {!status ? (
-                          <span className="text-muted/30">-</span>
-                        ) : status.status === 'accepted' ? (
-                          <span className="text-green-400 font-bold">
-                            +{status.attempts > 1 ? status.attempts - 1 : ''}
-                          </span>
-                        ) : status.status === 'frozen' ? (
-                          <span className="text-blue-400 font-bold tooltip hover:cursor-help" title={`Frozen after ${status.attempts} attempts`}>
-                            ?{status.attempts > 0 ? ` (+${status.attempts})` : ''}
-                          </span>
-                        ) : (
-                          <span className="text-red-400">-{status.attempts}</span>
-                        )}
+                      <td key={i} className={`px-2 py-1 text-center border-l border-white/5 align-middle ${bgClass}`}>
+                        {content}
                       </td>
                     );
                   })}
