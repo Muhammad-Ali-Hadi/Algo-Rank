@@ -80,7 +80,7 @@ function CodeDisplay({ charCount }) {
       {spans}
       {charCount > 0 && charCount < fullText.length && (
         <span className="inline-block w-[2px] h-[1em] align-middle ml-px"
-              style={{ backgroundColor: '#528BFF', animation: 'cursorBlink 1s step-end infinite' }} />
+          style={{ backgroundColor: '#528BFF', animation: 'cursorBlink 1s step-end infinite' }} />
       )}
     </pre>
   );
@@ -95,7 +95,7 @@ function RealisticKeyboard() {
     /* Function row */
     [
       { w: 1, label: 'esc' },
-      ...Array(12).fill(null).map((_, i) => ({ w: 1, label: `F${i+1}` })),
+      ...Array(12).fill(null).map((_, i) => ({ w: 1, label: `F${i + 1}` })),
       { w: 1, label: '⏻' },
     ],
     /* Number row */
@@ -281,12 +281,12 @@ export default function CinematicScrollIntro({ userName, children }) {
         @keyframes scrollBounce { 0%,100%{transform:translateY(0);opacity:1} 50%{transform:translateY(8px);opacity:0.3} }
       `}</style>
 
-      <div ref={wrapperRef} 
-           style={{ height: '600vh', '--lw': 'clamp(240px, 35vw, 500px)', '--lh': 'calc(var(--lw) * 0.625)' }} 
-           className="relative">
+      <div ref={wrapperRef}
+        style={{ height: '600vh', '--lw': 'clamp(240px, 35vw, 500px)', '--lh': 'calc(var(--lw) * 0.625)' }}
+        className="relative">
         <div ref={pinnedRef}
-             className="w-full h-screen overflow-hidden flex items-center justify-center"
-             style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(88,166,255,0.025) 0%, #000 65%)' }}>
+          className="w-full h-screen overflow-hidden flex items-center justify-center"
+          style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(88,166,255,0.025) 0%, #000 65%)' }}>
 
           {/* ═══ 3D SCENE ═══ */}
           <div style={{
@@ -340,14 +340,14 @@ export default function CinematicScrollIntro({ userName, children }) {
 
                     {/* Screen content */}
                     <div ref={screenRef}
-                         className="absolute inset-0 top-[10px] flex flex-col"
-                         style={{ opacity: 0 }}>
+                      className="absolute inset-0 top-[10px] flex flex-col"
+                      style={{ opacity: 0 }}>
                       {/* Editor title bar */}
                       <div className="flex items-center gap-1 px-2.5 py-1"
-                           style={{ background: '#1a1a1a', borderBottom: '1px solid #252525' }}>
-                        <span style={{ width:7,height:7,borderRadius:'50%',background:'#ff5f57',display:'inline-block' }} />
-                        <span style={{ width:7,height:7,borderRadius:'50%',background:'#febc2e',display:'inline-block' }} />
-                        <span style={{ width:7,height:7,borderRadius:'50%',background:'#28c840',display:'inline-block' }} />
+                        style={{ background: '#1a1a1a', borderBottom: '1px solid #252525' }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ff5f57', display: 'inline-block' }} />
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#febc2e', display: 'inline-block' }} />
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#28c840', display: 'inline-block' }} />
                         <span className="ml-2" style={{ color: C.comment, fontSize: 'clamp(6px,0.55vw,9px)' }}>
                           depth_first_search.cpp — AlgoRank
                         </span>
@@ -355,7 +355,7 @@ export default function CinematicScrollIntro({ userName, children }) {
                       {/* Editor body */}
                       <div className="flex flex-1 overflow-hidden" style={{ background: '#1e1e1e' }}>
                         <div className="flex flex-col items-end py-1.5 px-1 select-none"
-                             style={{ borderRight: '1px solid #252525', minWidth: '20px' }}>
+                          style={{ borderRight: '1px solid #252525', minWidth: '20px' }}>
                           {Array.from({ length: 18 }, (_, i) => (
                             <span key={i} style={{ color: '#444', fontSize: 'clamp(5px,0.45vw,8px)', lineHeight: 1.7 }}>
                               {i + 1}
@@ -370,7 +370,7 @@ export default function CinematicScrollIntro({ userName, children }) {
 
                     {/* Subtle screen reflection */}
                     <div className="absolute inset-0 pointer-events-none"
-                         style={{ background: 'linear-gradient(130deg, rgba(255,255,255,0.015) 0%, transparent 45%)' }} />
+                      style={{ background: 'linear-gradient(130deg, rgba(255,255,255,0.015) 0%, transparent 45%)' }} />
                   </div>
                 </div>
 
@@ -463,10 +463,10 @@ export default function CinematicScrollIntro({ userName, children }) {
 
           {/* ═══ WELCOME TEXT ═══ */}
           <div ref={welcomeRef}
-               className="absolute text-center w-full px-4"
-               style={{ bottom: 'clamp(70px, 12vh, 160px)', opacity: 0 }}>
+            className="absolute text-center w-full px-4"
+            style={{ bottom: 'clamp(70px, 12vh, 160px)', opacity: 0 }}>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold"
-                style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+              style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
               <span style={{
                 backgroundImage: 'linear-gradient(135deg, #58A6FF 0%, #79C0FF 40%, #1F6FEB 100%)',
                 WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
@@ -478,32 +478,32 @@ export default function CinematicScrollIntro({ userName, children }) {
 
           {/* ═══ DESCRIPTION ═══ */}
           <div ref={descRef}
-               className="absolute text-center w-full px-4"
-               style={{ bottom: 'clamp(24px, 5vh, 90px)', opacity: 0 }}>
+            className="absolute text-center w-full px-4"
+            style={{ bottom: 'clamp(24px, 5vh, 90px)', opacity: 0 }}>
             <p className="text-sm sm:text-base md:text-lg max-w-2xl mx-auto"
-               style={{ color: '#6B7280', fontFamily: "'Inter', system-ui, sans-serif" }}>
+              style={{ color: '#6B7280', fontFamily: "'Inter', system-ui, sans-serif" }}>
               Compete in coding contests, sharpen your algorithms, and climb the Algo-Rank leaderboard.
             </p>
           </div>
 
           {/* ═══ DASHBOARD CONTENT ═══ */}
           <div ref={dashboardRef}
-               className="absolute inset-0 overflow-auto"
-               style={{ opacity: 0, zIndex: 50 }}>
+            className="absolute inset-0 overflow-auto"
+            style={{ opacity: 0, zIndex: 50 }}>
             {children}
           </div>
 
           {/* ═══ SCROLL HINT ═══ */}
           <div ref={scrollHintRef}
-               className="absolute bottom-7 left-1/2 -translate-x-1/2 flex flex-col items-center"
-               style={{ zIndex: 5, opacity: 1 }}>
+            className="absolute bottom-7 left-1/2 -translate-x-1/2 flex flex-col items-center"
+            style={{ zIndex: 5, opacity: 1 }}>
             <span className="text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: '#484F58' }}>
               Scroll to explore
             </span>
             <div className="w-5 h-8 rounded-full flex items-start justify-center p-1"
-                 style={{ border: '1.5px solid #333' }}>
+              style={{ border: '1.5px solid #333' }}>
               <div className="w-1 h-2 rounded-full"
-                   style={{ background: '#484F58', animation: 'scrollBounce 2s ease-in-out infinite' }} />
+                style={{ background: '#484F58', animation: 'scrollBounce 2s ease-in-out infinite' }} />
             </div>
           </div>
         </div>
@@ -511,3 +511,31 @@ export default function CinematicScrollIntro({ userName, children }) {
     </>
   );
 }
+// </div >
+
+// {/* ═══ DASHBOARD CONTENT ═══ */ }
+// < div ref={dashboardRef}
+//   className="absolute inset-0 overflow-auto"
+//   style={{ opacity: 0, zIndex: 50 }}>
+//   {children}
+// </div >
+
+// {/* ═══ SCROLL HINT ═══ */ }
+// < div ref={scrollHintRef}
+//   className="absolute bottom-7 left-1/2 -translate-x-1/2 flex flex-col items-center"
+//   style={{ zIndex: 5, opacity: 1 }}>
+//   <span className="text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: '#484F58' }}>
+//     Scroll to explore
+//   </span>
+//   <div className="w-5 h-8 rounded-full flex items-start justify-center p-1"
+//     style={{ border: '1.5px solid #333' }}>
+//     <div className="w-1 h-2 rounded-full"
+//       style={{ background: '#484F58', animation: 'scrollBounce 2s ease-in-out infinite' }} />
+//   </div>
+// </div >
+// </div >
+//         </div >
+//       </div >
+//     </>
+//   );
+// }
