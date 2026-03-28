@@ -1,18 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import NeonLayout from '../components/NeonLayout';
 import { api } from '../services/api';
 
 export default function ProfilePage() {
-  const { user, setUser } = useAuth();
+  const { user, updateUser } = useAuth();
   const fileInputRef = useRef(null);
 
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [msg, setMsg] = useState({ text: '', type: '' });
+  const [error, setError] = useState(null);
+  const [successPopup, setSuccessPopup] = useState({
+    show: false,
+    message: "",
+  });
 
   useEffect(() => {
     if (user) {
@@ -24,14 +28,19 @@ export default function ProfilePage() {
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setMsg({ text: '', type: '' });
+    setError(null);
+    setSuccessPopup({ show: false, message: "" });
 
     try {
       const data = await api.updateProfileData({ name, username });
-      setUser({ ...user, ...data.user });
-      setMsg({ text: 'Profile updated successfully!', type: 'success' });
+      updateUser(data.user);
+      setSuccessPopup({
+        show: true,
+        message: "Profile updated successfully!",
+      });
+      setTimeout(() => setSuccessPopup({ show: false, message: "" }), 2500);
     } catch (err) {
-      setMsg({ text: err.message || 'Failed to update profile', type: 'error' });
+      setError(err.message || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -51,18 +60,52 @@ export default function ProfilePage() {
       const base64 = event.target.result;
       
       setUploading(true);
-      setMsg({ text: '', type: '' });
+      setError(null);
+      setSuccessPopup({ show: false, message: "" });
       try {
         const data = await api.uploadAvatar(base64);
-        setUser({ ...user, ...data.user });
-        setMsg({ text: 'Avatar updated!', type: 'success' });
+        updateUser(data.user);
+        
+        // Clear input so same file can be uploaded again if needed
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+        setSuccessPopup({
+          show: true,
+          message: "Profile photo updated successfully!",
+        });
+        setTimeout(() => setSuccessPopup({ show: false, message: "" }), 2500);
       } catch (err) {
-        setMsg({ text: err.message || 'Failed to upload avatar', type: 'error' });
+        setError(err.message || 'Failed to upload photo');
       } finally {
         setUploading(false);
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!window.confirm("Are you sure you want to remove your profile photo?")) return;
+    
+    setUploading(true);
+    setError(null);
+    setSuccessPopup({ show: false, message: "" });
+    try {
+      const data = await api.removeAvatar();
+      updateUser(data.user);
+      
+      // Clear input so if the user uploads the *exact same* file, onChange fires
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      setSuccessPopup({
+        show: true,
+        message: "Profile photo removed successfully!",
+      });
+      setTimeout(() => setSuccessPopup({ show: false, message: "" }), 2500);
+    } catch (err) {
+      setError(err.message || 'Failed to remove photo');
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (!user) return null;
@@ -80,15 +123,78 @@ export default function ProfilePage() {
           <p className="text-muted text-sm mt-1">Manage your profile and preferences.</p>
         </motion.div>
 
-        {msg.text && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className={`p-4 rounded-lg border ${msg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}
-          >
-            {msg.text}
-          </motion.div>
-        )}
+        {/* Success Popup */}
+        <AnimatePresence>
+          {successPopup.show && (
+            <motion.div
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div
+                className="relative bg-surface border border-primary/30 rounded-2xl p-8 max-w-sm mx-4 shadow-2xl"
+                style={{ boxShadow: '0 0 60px rgba(99,102,241,0.15), 0 25px 50px rgba(0,0,0,0.5)' }}
+                initial={{ opacity: 0, scale: 0.8, y: -30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: 30 }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Animated checkmark circle */}
+                <div className="flex justify-center mb-5">
+                  <motion.div
+                    className="w-16 h-16 rounded-full bg-gradient-to-br from-green-500/20 to-primary/20 border-2 border-green-400/40 flex items-center justify-center"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 15 }}
+                  >
+                    <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <motion.path
+                        strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                        d="M5 13l4 4L19 7"
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 1 }}
+                        transition={{ delay: 0.4, duration: 0.5, ease: "easeOut" }}
+                      />
+                    </svg>
+                  </motion.div>
+                </div>
+
+                {/* Success message */}
+                <motion.p
+                  className="text-center text-foreground text-base font-semibold whitespace-pre-line mb-2"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.3 }}
+                >
+                  {successPopup.message}
+                </motion.p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Inline Error Banner */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3"
+            >
+              <div className="shrink-0 w-8 h-8 rounded-full bg-red-500/15 flex items-center justify-center">
+                <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <p className="text-red-400 text-sm font-medium">{error}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Avatar Section */}
@@ -121,6 +227,16 @@ export default function ProfilePage() {
               accept="image/*"
               onChange={handleAvatarSelect}
             />
+
+            {user.avatar_url && (
+              <button
+                onClick={handleRemoveAvatar}
+                disabled={uploading}
+                className="mb-4 text-xs font-medium text-red-400 hover:text-red-300 transition-colors uppercase tracking-widest border border-red-500/20 bg-red-500/10 px-3 py-1.5 rounded-lg hover:bg-red-500/20"
+              >
+                {uploading ? 'Processing...' : 'Remove Photo'}
+              </button>
+            )}
             
             <h3 className="font-semibold text-foreground text-lg">{user.name}</h3>
             <p className="text-muted text-sm mb-4">@{user.username}</p>

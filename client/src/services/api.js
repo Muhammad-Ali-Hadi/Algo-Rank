@@ -101,4 +101,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ avatar_base64 }),
     }),
+  removeAvatar: () =>
+    fetchWithAuth('/profile/avatar', {
+      method: 'DELETE',
+    }),
 };

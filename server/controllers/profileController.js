@@ -102,4 +102,26 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
-module.exports = { getProfileData, updateProfileData, uploadAvatar };
+// ==================== REMOVE AVATAR ====================
+const removeAvatar = async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .update({ avatar_url: null })
+      .eq('id', req.user.id)
+      .select('id, email, username, name, avatar_url, created_at')
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to remove avatar' });
+    }
+
+    invalidate(KEYS.userProfile(req.user.id));
+
+    return res.status(200).json({ message: 'Avatar removed', user: data });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = { getProfileData, updateProfileData, uploadAvatar, removeAvatar };
