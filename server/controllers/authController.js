@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const bcrypt = require('bcrypt'); // NEW: bcrypt for secure password hashing
+const bcrypt = require('bcryptjs'); // CHANGED: bcryptjs for secure password hashing
 const { supabaseAdmin } = require('../services/supabaseClient');
 
 const SALT_ROUNDS = 10; // NEW: bcrypt cost factor

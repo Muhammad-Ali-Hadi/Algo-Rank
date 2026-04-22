@@ -147,7 +147,7 @@ export default function LoginCard() {
         setTimeout(() => {
           setSuccessPopup({ show: false, message: "", icon: "check" });
           resetForgotFlow();
-        }, 2500);
+        }, 400);
       } catch (err) {
         setForgotError(err.message || 'Failed to reset password.');
       } finally {
@@ -277,8 +277,8 @@ export default function LoginCard() {
           message: "Account created successfully!\nWelcome to AlgoRank, " + (name.split(' ')[0] || 'Coder') + "!",
           icon: "signup",
         });
-        // Redirect after 2 seconds
-        setTimeout(() => commitAuth(), 2000);
+        // Redirect after short delay
+        setTimeout(() => commitAuth(), 400);
       } catch (err) {
         setValidationPopup({
           show: true,
@@ -307,8 +307,8 @@ export default function LoginCard() {
           message: "Login Successful!\nWelcome back, " + (result.data?.user?.name?.split(' ')[0] || 'Coder') + "!",
           icon: "login",
         });
-        // Redirect after 2 seconds
-        setTimeout(() => commitAuth(), 2000);
+        // Redirect after short delay
+        setTimeout(() => commitAuth(), 400);
       } catch (err) {
         setError("Incorrect username or password. Please try again.");
       } finally {
