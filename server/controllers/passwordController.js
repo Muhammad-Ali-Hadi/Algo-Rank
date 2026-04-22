@@ -4,7 +4,7 @@
 // and password reset with bcrypt hashing
 // =============================================
 
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { supabaseAdmin } = require('../services/supabaseClient');
 const { sendOTPEmail } = require('../services/emailService');
