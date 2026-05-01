@@ -8,6 +8,8 @@ import ContestDetailPage from './pages/ContestDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import EditContestPage from './pages/EditContestPage';
 import ContestProblemPage from './pages/ContestProblemPage';
+import ProblemSetPage from './pages/ProblemSetPage';
+import ProblemDetailPage from './pages/ProblemDetailPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -91,6 +93,22 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/problems"
+        element={
+          <ProtectedRoute>
+            <ProblemSetPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/problems/:id"
+        element={
+          <ProtectedRoute>
+            <ProblemDetailPage />
           </ProtectedRoute>
         }
       />
