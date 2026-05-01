@@ -3,13 +3,36 @@ const { supabaseAdmin } = require('../services/supabaseClient');
 const { getOrSet, invalidate, invalidatePattern, KEYS } = require('../services/cacheService');
 const { scrapeProblem: scrapeFromUrl } = require('../services/scraperService');
 
+// Helper to check for duplicates in the problems array
+const validateUniqueProblems = (problemsArray) => {
+  if (!problemsArray || problemsArray.length === 0) return null;
+  const seenIds = new Set();
+  const seenTitles = new Set();
+  const seenUrls = new Set();
+
+  for (const p of problemsArray) {
+    if (p.id) {
+      if (seenIds.has(p.id)) return 'A contest cannot contain duplicate problems. Please ensure each problem is added only once.';
+      seenIds.add(p.id);
+    } else if (p.title) {
+      const lowerTitle = p.title.toLowerCase();
+      if (seenTitles.has(lowerTitle)) return `A contest cannot contain duplicate problems. The problem "${p.title}" was added multiple times.`;
+      seenTitles.add(lowerTitle);
+    } else if (p.url) {
+      if (seenUrls.has(p.url)) return 'A contest cannot contain duplicate problems. Please ensure each problem URL is added only once.';
+      seenUrls.add(p.url);
+    }
+  }
+  return null;
+};
+
 // Helper to process and insert problems for a contest
 const processProblemsForContest = async (contestId, problemsArray) => {
   if (!problemsArray || problemsArray.length === 0) return;
 
   const problemIds = problemsArray.filter(p => p.id).map(p => p.id);
   const problemTitles = problemsArray.filter(p => !p.id && p.title).map(p => p.title);
-  
+
   let dbProblems = [];
   let dbTestCases = [];
 
@@ -22,13 +45,18 @@ const processProblemsForContest = async (contestId, problemsArray) => {
     } else {
       query = query.in('title', problemTitles);
     }
-    
+
     const { data: probs } = await query;
     if (probs) dbProblems = probs;
 
     const matchedIds = dbProblems.map(dp => dp.id);
     if (matchedIds.length > 0) {
-      const { data: tcs } = await supabaseAdmin.from('test_cases').select('*').in('problem_id', matchedIds).order('order_index', { ascending: true });
+      const { data: tcs } = await supabaseAdmin
+        .from('test_cases')
+        .select('*')
+        .in('problem_id', matchedIds)
+        .eq('is_hidden', false)
+        .order('order_index', { ascending: true });
       if (tcs) dbTestCases = tcs;
     }
   }
@@ -57,6 +85,11 @@ const createGlobalContest = async (req, res) => {
 
   if (!name || !start_time || !end_time) {
     return res.status(400).json({ error: 'Name, start time, and end time are required' });
+  }
+
+  const duplicateError = validateUniqueProblems(problems);
+  if (duplicateError) {
+    return res.status(400).json({ error: duplicateError });
   }
 
   try {
@@ -98,6 +131,11 @@ const createLocalContest = async (req, res) => {
 
   if (!name || !start_time || !duration_seconds) {
     return res.status(400).json({ error: 'Name, start time, and duration are required' });
+  }
+
+  const duplicateError = validateUniqueProblems(problems);
+  if (duplicateError) {
+    return res.status(400).json({ error: duplicateError });
   }
 
   try {
@@ -260,6 +298,13 @@ const getContestById = async (req, res) => {
 const updateContest = async (req, res) => {
   const { id } = req.params;
   const { name, description, start_time, end_time, duration_seconds, visibility, freeze_time, problems } = req.body;
+
+  if (problems !== undefined) {
+    const duplicateError = validateUniqueProblems(problems);
+    if (duplicateError) {
+      return res.status(400).json({ error: duplicateError });
+    }
+  }
 
   try {
     // Check ownership or admin
@@ -502,16 +547,22 @@ const submitSolution = async (req, res) => {
     return res.status(400).json({ error: 'Either code or solution URL is required' });
   }
 
+  // Validate language
+  const { SUPPORTED_LANGUAGES } = require('../services/judgeService');
+  if (code_text && !SUPPORTED_LANGUAGES.includes(language)) {
+    return res.status(400).json({ error: `Unsupported language: ${language}. Supported: ${SUPPORTED_LANGUAGES.join(', ')}` });
+  }
+
   try {
-    // Verify contest and problem exist
-    const { data: problem } = await supabaseAdmin
+    // Verify contest and problem exist — also fetch problem_title for judge lookup
+    const { data: contestProblem } = await supabaseAdmin
       .from('contest_problems')
-      .select('id, contest_id')
+      .select('id, contest_id, problem_title')
       .eq('id', problem_id)
       .eq('contest_id', id)
       .single();
 
-    if (!problem) {
+    if (!contestProblem) {
       return res.status(404).json({ error: 'Problem not found in this contest' });
     }
 
@@ -527,6 +578,7 @@ const submitSolution = async (req, res) => {
       return res.status(403).json({ error: 'You must join the contest first' });
     }
 
+    // Insert submission with status = 'pending'
     const { data: submission, error: subErr } = await supabaseAdmin
       .from('submissions')
       .insert({
@@ -545,10 +597,40 @@ const submitSolution = async (req, res) => {
       return res.status(500).json({ error: 'Failed to submit solution' });
     }
 
+    // Fire off async evaluation in background (don't await — return immediately)
+    if (code_text) {
+      const { evaluateSubmission } = require('../services/judgeService');
+      evaluateSubmission(submission.id, contestProblem.problem_title, code_text, language)
+        .then(() => invalidate(KEYS.leaderboard(id)))
+        .catch(err => console.error('[SubmitSolution] Background evaluation failed:', err));
+    }
+
     invalidate(KEYS.leaderboard(id));
     return res.status(201).json({ message: 'Solution submitted', submission });
   } catch (err) {
     console.error('Submit solution exception:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ==================== GET SUBMISSION STATUS ====================
+const getSubmissionStatus = async (req, res) => {
+  const { subId } = req.params;
+
+  try {
+    const { data: submission, error } = await supabaseAdmin
+      .from('submissions')
+      .select('id, status')
+      .eq('id', subId)
+      .single();
+
+    if (error || !submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    return res.status(200).json(submission);
+  } catch (err) {
+    console.error('Get submission status exception:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -651,10 +733,10 @@ const getLeaderboard = async (req, res) => {
           // Penalty: minutes from contest start + 20min per wrong attempt
           const startTime = new Date(contest.start_time);
           const solveTimeMins = Math.max(0, Math.floor((new Date(sub.submitted_at) - startTime) / 60000));
-          
+
           userStats[uid].penalty += solveTimeMins + (prob.attempts - 1) * 20;
           prob.solveTime = solveTimeMins;
-          
+
           // Mark first blood
           if (firstBloods[problemKey] === uid) {
             prob.isFirstBlood = true;
@@ -679,6 +761,24 @@ const getLeaderboard = async (req, res) => {
   }
 };
 
+// ==================== COMPILE SOLUTION (Syntax Check) ====================
+const compileSolution = async (req, res) => {
+  const { language, code_text } = req.body;
+
+  if (!language || !code_text) {
+    return res.status(400).json({ error: 'Language and code are required' });
+  }
+
+  try {
+    const { checkSyntax } = require('../services/judgeService');
+    const result = await checkSyntax(code_text, language);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Compile solution exception:', error);
+    return res.status(500).json({ error: error.message || 'Compilation service unavailable' });
+  }
+};
+
 module.exports = {
   createGlobalContest,
   createLocalContest,
@@ -689,6 +789,8 @@ module.exports = {
   joinContest,
   joinByInviteCode,
   scrapeProblemHandler,
+  compileSolution,
   submitSolution,
+  getSubmissionStatus,
   getLeaderboard,
 };

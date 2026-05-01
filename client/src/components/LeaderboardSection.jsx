@@ -23,7 +23,7 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
 
   useEffect(() => {
     fetchLeaderboard();
-    
+
     // Poll every 30s if participant
     let interval;
     if (isParticipant) {
@@ -58,7 +58,7 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
   const problemLetters = Array.from({ length: problemsCount }, (_, i) => String.fromCharCode(65 + i));
 
   return (
-    <motion.div 
+    <motion.div
       className="neon-card p-6 overflow-hidden relative"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -68,7 +68,7 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
         <h2 className="text-xl font-bold flex items-center gap-2">
           <span>🏆</span> Leaderboard
         </h2>
-        
+
         <div className="flex items-center gap-3">
           {frozen && (
             <span className="neon-badge neon-badge-blue flex items-center gap-1">
@@ -76,7 +76,7 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
               Frozen
             </span>
           )}
-          <button 
+          <button
             onClick={fetchLeaderboard}
             className="text-muted hover:text-primary transition-colors p-1"
             title="Refresh"
@@ -119,14 +119,14 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                       <img src={row.user.avatar_url} alt="" className="w-6 h-6 rounded-full" />
                     ) : (
                       <div className="w-6 h-6 rounded-full bg-accent/30 flex items-center justify-center text-[10px] text-white">
-                        {row.user?.name?.charAt(0) || '?'}
+                        {row.user?.username?.charAt(0).toUpperCase() || '?'}
                       </div>
                     )}
-                    <span className="font-medium text-foreground">{row.user?.name || 'Unknown'}</span>
+                    <span className="font-medium text-foreground">@{row.user?.username || 'unknown'}</span>
                   </td>
                   <td className="px-4 py-3 text-center font-bold text-green-400">{row.solved}</td>
                   <td className="px-4 py-3 text-center font-mono text-muted">{row.penalty}</td>
-                  
+
                   {problemLetters.map((_, i) => {
                     const status = row.problems[`p${i}`];
                     if (!status) {
@@ -172,7 +172,7 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
           </tbody>
         </table>
       </div>
-      
+
       {frozen && (
         <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs rounded-lg flex items-center justify-center gap-2">
           <span>❄️</span> Scoreboard is frozen. Submissions made after the freeze time are hidden.

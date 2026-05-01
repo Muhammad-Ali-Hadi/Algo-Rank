@@ -33,11 +33,11 @@ async function fetchWithAuth(endpoint, options = {}) {
   }
 
   const data = await response.json();
-  
+
   if (isGet) {
     cache.set(endpoint, { timestamp: Date.now(), data });
   }
-  
+
   return data;
 }
 
@@ -87,6 +87,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  compileSolution: (data) =>
+    fetchWithAuth('/contests/compile', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getSubmissionStatus: (subId) =>
+    fetchWithAuth(`/contests/submissions/${subId}`),
   getLeaderboard: (contestId) =>
     fetchWithAuth(`/contests/${contestId}/leaderboard`),
 
