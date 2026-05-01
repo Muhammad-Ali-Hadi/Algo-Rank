@@ -17,7 +17,7 @@ drop policy if exists "auth_update" on public.users;
 
 drop trigger if exists on_auth_user_created on auth.users;
 drop function if exists public.handle_new_user();
-drop table if exists public.users;
+drop table if exists public.users cascade;
 
 -- STEP 2: Create users table
 create table public.users (
@@ -111,3 +111,41 @@ grant select on public.contests to authenticated;
 grant select on public.contest_problems to authenticated;
 grant select on public.contest_participants to authenticated;
 grant select on public.submissions to authenticated;
+
+-- ============================================
+-- Problem Bank & Test Cases Tables
+-- ============================================
+
+-- Problems table
+create table if not exists public.problems (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text default '',
+  difficulty text check (difficulty in ('easy', 'medium', 'hard')),
+  time_limit integer default 1000, -- in milliseconds
+  memory_limit integer default 256, -- in MB
+  created_at timestamp with time zone default now()
+);
+
+-- TestCases table
+create table if not exists public.test_cases (
+  id uuid primary key default gen_random_uuid(),
+  problem_id uuid not null references public.problems(id) on delete cascade,
+  input text not null,
+  expected_output text not null,
+  is_hidden boolean default false,
+  order_index integer default 0,
+  created_at timestamp with time zone default now()
+);
+
+-- Disable RLS for problem bank tables (backend uses service_role key)
+alter table public.problems disable row level security;
+alter table public.test_cases disable row level security;
+
+-- Grant access
+grant all on public.problems to service_role;
+grant all on public.test_cases to service_role;
+grant select on public.problems to anon;
+grant select on public.test_cases to anon;
+grant select on public.problems to authenticated;
+grant select on public.test_cases to authenticated;
