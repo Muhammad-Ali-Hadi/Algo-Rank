@@ -3,6 +3,54 @@ const { supabaseAdmin } = require('../services/supabaseClient');
 const { getOrSet, invalidate, invalidatePattern, KEYS } = require('../services/cacheService');
 const { scrapeProblem: scrapeFromUrl } = require('../services/scraperService');
 
+// Helper to process and insert problems for a contest
+const processProblemsForContest = async (contestId, problemsArray) => {
+  if (!problemsArray || problemsArray.length === 0) return;
+
+  const problemIds = problemsArray.filter(p => p.id).map(p => p.id);
+  const problemTitles = problemsArray.filter(p => !p.id && p.title).map(p => p.title);
+  
+  let dbProblems = [];
+  let dbTestCases = [];
+
+  if (problemIds.length > 0 || problemTitles.length > 0) {
+    let query = supabaseAdmin.from('problems').select('*');
+    if (problemIds.length > 0 && problemTitles.length > 0) {
+      query = query.or(`id.in.(${problemIds.join(',')}),title.in.("${problemTitles.join('","')}")`);
+    } else if (problemIds.length > 0) {
+      query = query.in('id', problemIds);
+    } else {
+      query = query.in('title', problemTitles);
+    }
+    
+    const { data: probs } = await query;
+    if (probs) dbProblems = probs;
+
+    const matchedIds = dbProblems.map(dp => dp.id);
+    if (matchedIds.length > 0) {
+      const { data: tcs } = await supabaseAdmin.from('test_cases').select('*').in('problem_id', matchedIds).order('order_index', { ascending: true });
+      if (tcs) dbTestCases = tcs;
+    }
+  }
+
+  const problemRows = problemsArray.map((p, i) => {
+    const dbProb = p.id ? dbProblems.find(dp => dp.id === p.id) : dbProblems.find(dp => dp.title.toLowerCase() === p.title.toLowerCase());
+    const tc = dbProb ? dbTestCases.filter(t => t.problem_id === dbProb.id) : [];
+
+    return {
+      contest_id: contestId,
+      problem_title: dbProb ? dbProb.title : p.title,
+      problem_url: p.url || '',
+      order_index: i,
+      scraped_content: dbProb ? dbProb.description : null,
+      scraped_samples: tc && tc.length > 0 ? tc.map(t => ({ input: t.input, output: t.expected_output })) : null,
+      scraped_at: dbProb ? new Date().toISOString() : null
+    };
+  });
+
+  await supabaseAdmin.from('contest_problems').insert(problemRows);
+};
+
 // ==================== CREATE GLOBAL CONTEST (Admin Only) ====================
 const createGlobalContest = async (req, res) => {
   const { name, description, start_time, end_time, duration_seconds, problems, freeze_time } = req.body;
@@ -34,16 +82,7 @@ const createGlobalContest = async (req, res) => {
     }
 
     // Insert problems if provided
-    if (problems && problems.length > 0) {
-      const problemRows = problems.map((p, i) => ({
-        contest_id: contest.id,
-        problem_title: p.title,
-        problem_url: p.url || '',
-        order_index: i,
-      }));
-
-      await supabaseAdmin.from('contest_problems').insert(problemRows);
-    }
+    await processProblemsForContest(contest.id, problems);
 
     invalidatePattern('contests:');
     return res.status(201).json({ message: 'Global contest created', contest });
@@ -95,16 +134,7 @@ const createLocalContest = async (req, res) => {
       .insert({ contest_id: contest.id, user_id: req.user.id });
 
     // Insert problems if provided
-    if (problems && problems.length > 0) {
-      const problemRows = problems.map((p, i) => ({
-        contest_id: contest.id,
-        problem_title: p.title,
-        problem_url: p.url || '',
-        order_index: i,
-      }));
-
-      await supabaseAdmin.from('contest_problems').insert(problemRows);
-    }
+    await processProblemsForContest(contest.id, problems);
 
     invalidatePattern('contests:');
     return res.status(201).json({ message: 'Local contest created', contest });
@@ -280,17 +310,7 @@ const updateContest = async (req, res) => {
     if (problems !== undefined) {
       // Delete existing problems and re-insert
       await supabaseAdmin.from('contest_problems').delete().eq('contest_id', id);
-
-      if (problems.length > 0) {
-        const problemRows = problems.map((p, i) => ({
-          contest_id: id,
-          problem_title: p.title,
-          problem_url: p.url || '',
-          order_index: i,
-        }));
-
-        await supabaseAdmin.from('contest_problems').insert(problemRows);
-      }
+      await processProblemsForContest(id, problems);
     }
 
     invalidate(KEYS.contest(id));

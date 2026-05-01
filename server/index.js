@@ -7,6 +7,7 @@ const authRoutes = require('./routes/authRoutes');
 const passwordRoutes = require('./routes/passwordRoutes');
 const contestRoutes = require('./routes/contestRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const problemRoutes = require('./routes/problemRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { generalLimiter, authLimiter } = require('./middleware/rateLimiter');
 
@@ -30,6 +31,7 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/password', authLimiter, passwordRoutes);
 app.use('/api/contests', contestRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/problems', problemRoutes);
 
 // Error handling
 app.use(notFound);

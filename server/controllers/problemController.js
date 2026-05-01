@@ -1,0 +1,79 @@
+const { supabaseAdmin } = require('../services/supabaseClient');
+
+// ==================== GET PROBLEMS (PAGINATED) ====================
+const getProblems = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    
+    // Calculate range
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // Fetch problems with pagination count
+    const { data: problems, error, count } = await supabaseAdmin
+      .from('problems')
+      .select('id, title, difficulty, time_limit, memory_limit, created_at', { count: 'exact' })
+      .order('created_at', { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      console.error('Get problems error:', error);
+      return res.status(500).json({ error: 'Failed to fetch problems' });
+    }
+
+    return res.status(200).json({
+      problems: problems || [],
+      total: count || 0,
+      page,
+      limit,
+      totalPages: count ? Math.ceil(count / limit) : 0
+    });
+  } catch (err) {
+    console.error('Get problems exception:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ==================== GET PROBLEM BY ID ====================
+const getProblemById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Fetch problem details
+    const { data: problem, error: probError } = await supabaseAdmin
+      .from('problems')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (probError || !problem) {
+      return res.status(404).json({ error: 'Problem not found' });
+    }
+
+    // Fetch associated test cases
+    const { data: testCases, error: tcError } = await supabaseAdmin
+      .from('test_cases')
+      .select('*')
+      .eq('problem_id', id)
+      .order('order_index', { ascending: true });
+
+    if (tcError) {
+      console.error('Get test cases error:', tcError);
+      // We don't fail completely if test cases fail, but we log it
+    }
+
+    return res.status(200).json({
+      problem,
+      testCases: testCases || []
+    });
+  } catch (err) {
+    console.error('Get problem by id exception:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+module.exports = {
+  getProblems,
+  getProblemById
+};

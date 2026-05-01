@@ -20,6 +20,7 @@ export default function Navbar() {
   const navLinks = [
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/contests', label: 'Contests' },
+    { to: '/problems', label: 'Problem set' },
   ];
 
   return (

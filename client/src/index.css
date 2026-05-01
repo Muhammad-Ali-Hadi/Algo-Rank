@@ -35,6 +35,126 @@
 }
 
 @layer components {
+  /* ============================
+     Problem Description Styles
+     (Handles Codeforces HTML)
+     ============================ */
+  .problem-body {
+    line-height: 1.8;
+    color: rgba(229, 231, 235, 0.9);
+  }
+
+  /* Section titles like "Input", "Output", "Note" */
+  .problem-body .problem-section-title,
+  .problem-body h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #58a6ff;
+    margin-top: 1.75rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(88, 166, 255, 0.15);
+    text-align: left;
+  }
+
+  .problem-body h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #e5e7eb;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    text-align: left;
+  }
+
+  /* Paragraphs */
+  .problem-body p {
+    margin-bottom: 0.85rem;
+    text-align: justify;
+    hyphens: auto;
+    color: rgba(229, 231, 235, 0.85);
+  }
+
+  /* Inline math rendered by MathJax */
+  .problem-body mjx-container {
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  /* Code / pre blocks */
+  .problem-body pre,
+  .problem-body code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85em;
+    background: rgba(10, 10, 15, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 6px;
+  }
+
+  .problem-body pre {
+    padding: 0.85rem 1rem;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+    white-space: pre;
+    text-align: left;
+  }
+
+  .problem-body code {
+    padding: 0.15em 0.4em;
+  }
+
+  /* Lists */
+  .problem-body ul,
+  .problem-body ol {
+    padding-left: 1.5rem;
+    margin-bottom: 0.85rem;
+    text-align: justify;
+  }
+
+  .problem-body li {
+    margin-bottom: 0.3rem;
+    color: rgba(229, 231, 235, 0.85);
+  }
+
+  /* Codeforces-specific: constraints table */
+  .problem-body .property-title {
+    font-weight: 600;
+    color: #8b949e;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Codeforces block "p" with math */
+  .problem-body .tex-font-size-tiny  { font-size: 0.6em; }
+  .problem-body .tex-font-size-script { font-size: 0.7em; }
+  .problem-body .tex-font-size-footnote { font-size: 0.8em; }
+  .problem-body .tex-font-size-small { font-size: 0.85em; }
+  .problem-body .tex-font-size-large { font-size: 1.2em; }
+  .problem-body .tex-font-size-Large { font-size: 1.4em; }
+  .problem-body .tex-font-size-LARGE { font-size: 1.7em; }
+  .problem-body .tex-font-size-huge  { font-size: 2em; }
+  .problem-body .tex-font-size-Huge  { font-size: 2.5em; }
+
+  /* Strong / bold */
+  .problem-body strong,
+  .problem-body b {
+    color: #e5e7eb;
+    font-weight: 600;
+  }
+
+  /* Italic / em */
+  .problem-body em,
+  .problem-body i {
+    color: rgba(229, 231, 235, 0.75);
+  }
+
+  /* Subscript / superscript */
+  .problem-body sup,
+  .problem-body sub {
+    font-size: 0.75em;
+  }
+
+
   .glass {
     background: rgba(10, 10, 10, 0.75);
     backdrop-filter: blur(16px);

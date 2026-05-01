@@ -28,6 +28,8 @@ export default function EditContestPage() {
   });
   
   const [problems, setProblems] = useState([]);
+  const [availableProblems, setAvailableProblems] = useState([]);
+  const [focusedIndex, setFocusedIndex] = useState(null);
 
   useEffect(() => {
     const fetchContest = async () => {
@@ -52,7 +54,7 @@ export default function EditContestPage() {
           freeze_time: c.freeze_time ? c.freeze_time.slice(0, 16) : '',
         });
         
-        setProblems(p.length > 0 ? p.map(prob => ({ title: prob.problem_title, url: prob.problem_url })) : [{ title: '', url: '' }]);
+        setProblems(p.length > 0 ? p.map(prob => ({ title: prob.problem_title, id: null })) : [{ title: '', id: null }]);
       } catch (err) {
         setError('Failed to load contest data');
       } finally {
@@ -60,11 +62,21 @@ export default function EditContestPage() {
       }
     };
 
+    const fetchAvailableProblems = async () => {
+      try {
+        const data = await api.getProblems(1, 100);
+        setAvailableProblems(data.problems || []);
+      } catch (err) {
+        console.error('Failed to load problems for suggestions', err);
+      }
+    };
+
     fetchContest();
+    fetchAvailableProblems();
   }, [id, profile, navigate]);
 
   const addProblem = () => {
-    setProblems([...problems, { title: '', url: '' }]);
+    setProblems([...problems, { title: '', id: null }]);
   };
 
   const removeProblem = (index) => {
@@ -75,6 +87,17 @@ export default function EditContestPage() {
   const updateProblem = (index, field, value) => {
     const updated = [...problems];
     updated[index][field] = value;
+    
+    // Auto-match ID if title matches exactly
+    if (field === 'title') {
+      const match = availableProblems.find(p => p.title.toLowerCase() === value.toLowerCase());
+      if (match) {
+        updated[index].id = match.id;
+      } else {
+        delete updated[index].id;
+      }
+    }
+    
     setProblems(updated);
   };
 
@@ -273,22 +296,53 @@ export default function EditContestPage() {
                   <span className="text-primary font-bold mt-2.5 w-6 shrink-0 text-center">
                     {String.fromCharCode(65 + i)}
                   </span>
-                  <div className="flex-1 space-y-2">
+                  <div className="relative flex-1">
                     <input
                       type="text"
-                      className="neon-input"
-                      placeholder="Problem title"
+                      className="neon-input w-full"
+                      placeholder="Search problem by name..."
                       value={p.title}
+                      onFocus={() => setFocusedIndex(i)}
+                      onBlur={() => setTimeout(() => setFocusedIndex(null), 200)}
                       onChange={(e) => updateProblem(i, 'title', e.target.value)}
                     />
-                    <input
-                      type="url"
-                      className="neon-input text-xs"
-                      placeholder="Problem URL (https://codeforces.com/...)"
-                      value={p.url}
-                      onChange={(e) => updateProblem(i, 'url', e.target.value)}
-                    />
+                    {focusedIndex === i && p.title && (
+                      <div className="absolute z-50 w-full mt-1 bg-[#0a0a0f] border border-white/10 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                        {availableProblems
+                          .filter(ap => ap.title.toLowerCase().includes(p.title.toLowerCase()))
+                          .map(ap => (
+                            <div 
+                              key={ap.id}
+                              className="px-4 py-2 hover:bg-white/5 cursor-pointer flex justify-between items-center transition-colors"
+                              onClick={() => {
+                                updateProblem(i, 'title', ap.title);
+                                setFocusedIndex(null);
+                              }}
+                            >
+                              <span className="text-sm text-foreground">{ap.title}</span>
+                              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${ap.difficulty === 'easy' ? 'bg-green-500/10 border-green-500/30 text-green-400' : ap.difficulty === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                                {ap.difficulty}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
+                  
+                  {p.id ? (
+                    <div className="flex flex-col justify-center shrink-0 w-16">
+                      <span className="text-green-400 text-[10px] uppercase font-bold tracking-wider flex items-center justify-center mb-1">✓ Found</span>
+                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1 py-0.5 rounded text-center border ${
+                        availableProblems.find(ap => ap.id === p.id)?.difficulty === 'easy' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                        availableProblems.find(ap => ap.id === p.id)?.difficulty === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                        'bg-red-500/10 border-red-500/30 text-red-400'
+                      }`}>
+                        {availableProblems.find(ap => ap.id === p.id)?.difficulty}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="w-16 shrink-0"></div>
+                  )}
                   {problems.length > 1 && (
                     <button
                       type="button"

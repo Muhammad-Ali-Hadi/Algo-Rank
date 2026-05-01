@@ -105,4 +105,8 @@ export const api = {
     fetchWithAuth('/profile/avatar', {
       method: 'DELETE',
     }),
+
+  // Problem APIs
+  getProblems: (page = 1, limit = 20) => fetchWithAuth(`/problems?page=${page}&limit=${limit}`),
+  getProblemById: (id) => fetchWithAuth(`/problems/${id}`),
 };
