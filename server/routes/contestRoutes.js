@@ -13,7 +13,9 @@ const {
   joinContest,
   joinByInviteCode,
   scrapeProblemHandler,
+  compileSolution,
   submitSolution,
+  getSubmissionStatus,
   getLeaderboard,
 } = require('../controllers/contestController');
 
@@ -47,8 +49,14 @@ router.delete('/:id', deleteContest);
 // Join a contest
 router.post('/:id/join', joinContest);
 
+// Compile code (Syntax Check)
+router.post('/compile', compileSolution);
+
 // Submit a solution (rate limited)
 router.post('/:id/submit', submissionLimiter, submitSolution);
+
+// Get submission status
+router.get('/submissions/:subId', getSubmissionStatus);
 
 // Get leaderboard
 router.get('/:id/leaderboard', getLeaderboard);

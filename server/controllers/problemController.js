@@ -51,11 +51,12 @@ const getProblemById = async (req, res) => {
       return res.status(404).json({ error: 'Problem not found' });
     }
 
-    // Fetch associated test cases
+    // Fetch associated public test cases only
     const { data: testCases, error: tcError } = await supabaseAdmin
       .from('test_cases')
       .select('*')
       .eq('problem_id', id)
+      .eq('is_hidden', false)
       .order('order_index', { ascending: true });
 
     if (tcError) {
