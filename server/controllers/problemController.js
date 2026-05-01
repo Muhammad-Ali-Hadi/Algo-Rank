@@ -5,7 +5,7 @@ const getProblems = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    
+
     // Calculate range
     const from = (page - 1) * limit;
     const to = from + limit - 1;
