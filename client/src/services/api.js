@@ -118,6 +118,13 @@ export const api = {
     fetchWithAuth(`/contests/submissions/${subId}`),
   getLeaderboard: (contestId) =>
     fetchWithAuth(`/contests/${contestId}/leaderboard`),
+  forkProblem: (contestId, problemId) =>
+    fetchWithAuth(`/contests/${contestId}/fork/${problemId}`, { method: 'POST' }),
+  updateForkDescription: (forkId, description) =>
+    fetchWithAuth(`/contests/fork/${forkId}/description`, {
+      method: 'PUT',
+      body: JSON.stringify({ description }),
+    }),
 
   // Profile APIs
   updateProfileData: (data) =>

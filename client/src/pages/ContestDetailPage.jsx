@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import NeonLayout from '../components/NeonLayout';
 import LeaderboardSection from '../components/LeaderboardSection';
+import EditForkDescriptionModal from '../components/EditForkDescriptionModal';
 import { api } from '../services/api';
 import { generateProblemSlug } from '../utils/slugify';
 
@@ -56,6 +57,13 @@ export default function ContestDetailPage() {
   const [activeTab, setActiveTab] = useState('problems');
   const [now, setNow] = useState(new Date());
   const [serverTimeOffset, setServerTimeOffset] = useState(0);
+
+  // Fork state
+  const [forkingId, setForkingId] = useState(null);
+  const [forkModal, setForkModal] = useState(false);
+  const [selectedFork, setSelectedFork] = useState(null);
+  const [savingFork, setSavingFork] = useState(false);
+  const [forkMsg, setForkMsg] = useState({ text: '', type: '' });
 
   // Timer effect
   useEffect(() => {
@@ -129,6 +137,49 @@ export default function ContestDetailPage() {
       navigate('/contests');
     } catch (err) {
       alert(err.message || 'Failed to delete');
+    }
+  };
+
+  const handleFork = async (e, problem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setForkingId(problem.id);
+    setForkMsg({ text: '', type: '' });
+    try {
+      const res = await api.forkProblem(id, problem.id);
+      setSelectedFork({
+        id: res.fork.id,
+        problem_title: res.fork.title,
+        scraped_content: res.fork.description,
+        scraped_samples: problem.scraped_samples || [],
+      });
+      setForkModal(true);
+    } catch (err) {
+      if (err.message?.includes('already forked')) {
+        setForkMsg({ text: 'Already forked this problem', type: 'warn' });
+      } else {
+        setForkMsg({ text: err.message || 'Fork failed', type: 'error' });
+      }
+      setTimeout(() => setForkMsg({ text: '', type: '' }), 3000);
+    } finally {
+      setForkingId(null);
+    }
+  };
+
+  const handleSaveForkDescription = async (description) => {
+    if (!selectedFork) return;
+    setSavingFork(true);
+    try {
+      await api.updateForkDescription(selectedFork.id, description);
+      setForkModal(false);
+      setSelectedFork(null);
+      setForkMsg({ text: 'Fork saved successfully!', type: 'success' });
+      fetchContest(); // Refresh contest data to show new description in UI if applicable
+      setTimeout(() => setForkMsg({ text: '', type: '' }), 3000);
+    } catch (err) {
+      setForkMsg({ text: err.message || 'Failed to save', type: 'error' });
+    } finally {
+      setSavingFork(false);
     }
   };
 
@@ -346,14 +397,25 @@ export default function ContestDetailPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3">
+                  {forkMsg.text && (
+                    <div className={`p-3 rounded-lg border text-sm flex items-center gap-2 ${
+                      forkMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                      forkMsg.type === 'warn' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                      'bg-red-500/10 border-red-500/30 text-red-400'
+                    }`}>
+                      {forkMsg.type === 'success' ? '✓' : forkMsg.type === 'warn' ? '⚠' : '✕'} {forkMsg.text}
+                    </div>
+                  )}
                   {problems.map((problem, i) => (
-                    <Link 
+                    <div 
                       key={problem.id}
-                      to={`/contests/${id}/problem/${generateProblemSlug(problem.problem_title)}`}
                       className="flex flex-col sm:flex-row sm:items-center gap-4 p-5 rounded-xl bg-gradient-to-r from-white/[0.03] to-transparent border border-white/[0.08] hover:border-primary/50 hover:bg-white/[0.05] transition-all group"
                     >
-                      <div className="flex items-center gap-4 flex-1">
-                        <span className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold shadow-lg text-lg border border-primary/20 group-hover:bg-primary/20 transition-colors">
+                      <Link
+                        to={`/contests/${id}/problem/${generateProblemSlug(problem.problem_title)}`}
+                        className="flex items-center gap-4 flex-1 min-w-0"
+                      >
+                        <span className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold shadow-lg text-lg border border-primary/20 group-hover:bg-primary/20 transition-colors shrink-0">
                           {String.fromCharCode(65 + i)}
                         </span>
                         <div className="flex-1 min-w-0">
@@ -362,8 +424,38 @@ export default function ContestDetailPage() {
                             Solve Problem →
                           </p>
                         </div>
-                      </div>
-                    </Link>
+                      </Link>
+
+                      {/* Fork Button — only visible during scheduling phase */}
+                      {status === 'upcoming' && (
+                        <button
+                          onClick={(e) => handleFork(e, problem)}
+                          disabled={forkingId === problem.id}
+                          className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all border
+                            bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border-yellow-500/30 text-yellow-400
+                            hover:from-yellow-500/20 hover:to-amber-500/10 hover:border-yellow-500/50 hover:shadow-[0_0_12px_rgba(234,179,8,0.2)]
+                            disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Create a personal fork of this problem"
+                        >
+                          {forkingId === problem.id ? (
+                            <>
+                              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Forking...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                              </svg>
+                              Fork Problem
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
@@ -427,6 +519,16 @@ export default function ContestDetailPage() {
           )}
         </div>
       </motion.div>
+
+      {/* Fork Description Modal */}
+      <EditForkDescriptionModal
+        key={selectedFork?.id || 'no-fork'}
+        isOpen={forkModal}
+        onClose={() => { setForkModal(false); setSelectedFork(null); }}
+        problem={selectedFork}
+        onSave={handleSaveForkDescription}
+        saving={savingFork}
+      />
     </NeonLayout>
   );
 }
