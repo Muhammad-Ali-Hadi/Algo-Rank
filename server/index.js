@@ -10,6 +10,7 @@ const profileRoutes = require('./routes/profileRoutes');
 const problemRoutes = require('./routes/problemRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { generalLimiter, authLimiter } = require('./middleware/rateLimiter');
+const { globalThrottler } = require('./middleware/throttler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,8 +24,9 @@ app.use(cors({
 app.use(morgan('dev'));
 app.use(express.json({ limit: '2mb' })); // Increased for avatar base64
 
-// Global rate limiter
+// Global rate limiter & Concurrency Queue
 app.use(generalLimiter);
+app.use(globalThrottler);
 
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
