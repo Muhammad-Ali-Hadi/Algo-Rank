@@ -260,54 +260,65 @@ async function evaluateSubmission(submissionId, problemTitle, code, language) {
 
     console.log(`[JudgeService] Evaluating submission ${submissionId.slice(0,8)}... against ${testCases.length} test cases`);
 
-    // 3. Execute against each test case sequentially (early-exit on failure)
+    // 3. Execute concurrently in chunks (e.g., 5 at a time) to drastically reduce turnaround time
+    const CHUNK_SIZE = 5;
     let passedCount = 0;
 
-    for (const tc of testCases) {
-      let result;
-      try {
-        result = await executeOnJudge0(code, languageId, tc.input || '');
-      } catch (err) {
-        console.error(`[JudgeService] Judge0 execution failed for TC ${tc.order_index}:`, err.message);
-        await updateSubmissionStatus(submissionId, 'runtime_error');
-        return;
+    for (let i = 0; i < testCases.length; i += CHUNK_SIZE) {
+      const chunk = testCases.slice(i, i + CHUNK_SIZE);
+      
+      const chunkResults = await Promise.allSettled(
+        chunk.map(tc => executeOnJudge0(code, languageId, tc.input || ''))
+      );
+
+      for (let j = 0; j < chunk.length; j++) {
+        const tc = chunk[j];
+        const res = chunkResults[j];
+
+        if (res.status === 'rejected') {
+          console.error(`[JudgeService] Judge0 execution failed for TC ${tc.order_index}:`, res.reason.message);
+          await updateSubmissionStatus(submissionId, 'runtime_error');
+          return;
+        }
+
+        const result = res.value;
+
+        // Check for compilation error
+        if (result.statusId === 6) {
+          await updateSubmissionStatus(submissionId, 'compile_error');
+          return;
+        }
+
+        // Check for runtime error
+        if (result.statusId >= 7 && result.statusId <= 12) {
+          await updateSubmissionStatus(submissionId, 'runtime_error');
+          return;
+        }
+
+        // Check for TLE
+        if (result.statusId === 5) {
+          await updateSubmissionStatus(submissionId, 'time_limit');
+          return;
+        }
+
+        // Check for internal Judge0 error
+        if (result.statusId === 13 || result.statusId === 14) {
+          await updateSubmissionStatus(submissionId, 'runtime_error');
+          return;
+        }
+
+        // Logical correctness: compare stdout with expected output
+        const actual   = normalizeOutput(result.stdout);
+        const expected = normalizeOutput(tc.expected_output);
+
+        if (actual !== expected) {
+          console.log(`[JudgeService] Wrong Answer on TC ${tc.order_index} (hidden: ${tc.is_hidden})`);
+          await updateSubmissionStatus(submissionId, 'wrong_answer');
+          return; // Early exit
+        }
+
+        passedCount++;
       }
-
-      // ── Check for compilation error (should only happen on first TC) ──
-      if (result.statusId === 6) {
-        await updateSubmissionStatus(submissionId, 'compile_error');
-        return;
-      }
-
-      // ── Check for runtime error ──
-      if (result.statusId >= 7 && result.statusId <= 12) {
-        await updateSubmissionStatus(submissionId, 'runtime_error');
-        return;
-      }
-
-      // ── Check for TLE ──
-      if (result.statusId === 5) {
-        await updateSubmissionStatus(submissionId, 'time_limit');
-        return;
-      }
-
-      // ── Check for internal Judge0 error ──
-      if (result.statusId === 13 || result.statusId === 14) {
-        await updateSubmissionStatus(submissionId, 'runtime_error');
-        return;
-      }
-
-      // ── Logical correctness: compare stdout with expected output ──
-      const actual   = normalizeOutput(result.stdout);
-      const expected = normalizeOutput(tc.expected_output);
-
-      if (actual !== expected) {
-        console.log(`[JudgeService] Wrong Answer on TC ${tc.order_index} (hidden: ${tc.is_hidden})`);
-        await updateSubmissionStatus(submissionId, 'wrong_answer');
-        return; // Early exit
-      }
-
-      passedCount++;
     }
 
     // 4. All test cases passed

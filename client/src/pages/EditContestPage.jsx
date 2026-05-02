@@ -16,6 +16,12 @@ export default function EditContestPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
+  const formatForInput = (utcString) => {
+    if (!utcString) return '';
+    const d = new Date(utcString);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+
   const [contest, setContest] = useState(null);
   const [form, setForm] = useState({
     name: '',
@@ -49,9 +55,9 @@ export default function EditContestPage() {
           description: c.description || '',
           visibility: c.visibility,
           duration_seconds: c.duration_seconds || 0,
-          start_time: c.start_time ? c.start_time.slice(0, 16) : '',
-          end_time: c.end_time ? c.end_time.slice(0, 16) : '',
-          freeze_time: c.freeze_time ? c.freeze_time.slice(0, 16) : '',
+          start_time: formatForInput(c.start_time),
+          end_time: formatForInput(c.end_time),
+          freeze_time: formatForInput(c.freeze_time),
         });
         
         setProblems(p.length > 0 ? p.map(prob => ({ title: prob.problem_title, id: null })) : [{ title: '', id: null }]);

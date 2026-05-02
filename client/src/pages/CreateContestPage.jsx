@@ -102,6 +102,9 @@ export default function CreateContestPage() {
         },
         body: JSON.stringify({
           ...globalForm,
+          start_time: globalForm.start_time ? new Date(globalForm.start_time).toISOString() : null,
+          end_time: globalForm.end_time ? new Date(globalForm.end_time).toISOString() : null,
+          freeze_time: globalForm.freeze_time ? new Date(globalForm.freeze_time).toISOString() : null,
           problems: validProblems,
         }),
       });
@@ -139,6 +142,8 @@ export default function CreateContestPage() {
         },
         body: JSON.stringify({
           ...localForm,
+          start_time: localForm.start_time ? new Date(localForm.start_time).toISOString() : null,
+          freeze_time: localForm.freeze_time ? new Date(localForm.freeze_time).toISOString() : null,
           problems: validProblems,
         }),
       });

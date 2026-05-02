@@ -53,6 +53,14 @@ async function scrapeCodeforces(url) {
     }
   });
 
+  // Helper to extract text while preserving block newlines
+  const extractWithNewlines = (el) => {
+    const cloned = el.clone();
+    cloned.find('br').replaceWith('\n');
+    cloned.find('.test-example-line').each((_, div) => $(div).append('\n'));
+    return cloned.text().trim();
+  };
+
   // Extract sample test cases
   const samples = [];
   statementDiv.find('.sample-test').each((_, testEl) => {
@@ -62,8 +70,8 @@ async function scrapeCodeforces(url) {
 
     const inputCount = Math.max(inputs.length, outputs.length);
     for (let i = 0; i < inputCount; i++) {
-      const inputText = inputs.eq(i).text().trim();
-      const outputText = outputs.eq(i).text().trim();
+      const inputText = extractWithNewlines(inputs.eq(i));
+      const outputText = extractWithNewlines(outputs.eq(i));
       if (inputText || outputText) {
         samples.push({ input: inputText, output: outputText });
       }

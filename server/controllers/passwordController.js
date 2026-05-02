@@ -38,11 +38,11 @@ setInterval(() => {
 // ==================== FORGOT PASSWORD ====================
 // Generates OTP and sends it to the user's registered email
 const forgotPassword = async (req, res) => {
-  const { email } = req.body;
-
-  if (!email) {
+  const emailRaw = req.body.email;
+  if (!emailRaw) {
     return res.status(400).json({ error: 'Email is required' });
   }
+  const email = emailRaw.trim();
 
   try {
     // Check if user exists with this email
@@ -79,11 +79,13 @@ const forgotPassword = async (req, res) => {
 // ==================== VERIFY OTP ====================
 // Validates the OTP the user entered (correctness + expiration)
 const verifyOtp = async (req, res) => {
-  const { email, otp } = req.body;
+  const emailRaw = req.body.email;
+  const { otp } = req.body;
 
-  if (!email || !otp) {
+  if (!emailRaw || !otp) {
     return res.status(400).json({ error: 'Email and OTP are required' });
   }
+  const email = emailRaw.trim();
 
   const stored = otpStore.get(email.toLowerCase());
 
@@ -111,11 +113,13 @@ const verifyOtp = async (req, res) => {
 // ==================== RESET PASSWORD ====================
 // Resets the user's password after OTP verification
 const resetPassword = async (req, res) => {
-  const { email, otp, newPassword } = req.body;
+  const emailRaw = req.body.email;
+  const { otp, newPassword } = req.body;
 
-  if (!email || !otp || !newPassword) {
+  if (!emailRaw || !otp || !newPassword) {
     return res.status(400).json({ error: 'Email, OTP, and new password are required' });
   }
+  const email = emailRaw.trim();
 
   // Validate new password strength
   if (newPassword.length < 8) {

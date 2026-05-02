@@ -24,10 +24,10 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
   useEffect(() => {
     fetchLeaderboard();
 
-    // Poll every 30s if participant
+    // Poll every 5s if participant
     let interval;
     if (isParticipant) {
-      interval = setInterval(fetchLeaderboard, 30000);
+      interval = setInterval(fetchLeaderboard, 5000);
     }
     return () => clearInterval(interval);
   }, [contestId, isParticipant]);
@@ -119,10 +119,13 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                       <img src={row.user.avatar_url} alt="" className="w-6 h-6 rounded-full" />
                     ) : (
                       <div className="w-6 h-6 rounded-full bg-accent/30 flex items-center justify-center text-[10px] text-white">
-                        {row.user?.username?.charAt(0).toUpperCase() || '?'}
+                        {row.user?.name?.charAt(0).toUpperCase() || row.user?.username?.charAt(0).toUpperCase() || '?'}
                       </div>
                     )}
-                    <span className="font-medium text-foreground">@{row.user?.username || 'unknown'}</span>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-foreground text-sm">{row.user?.name || row.user?.username || 'Unknown User'}</span>
+                      {row.user?.username && <span className="text-[10px] text-muted -mt-0.5">@{row.user.username}</span>}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-center font-bold text-green-400">{row.solved}</td>
                   <td className="px-4 py-3 text-center font-mono text-muted">{row.penalty}</td>
@@ -137,11 +140,15 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                     let content = null;
 
                     if (status.status === 'accepted') {
-                      bgClass = status.isFirstBlood ? 'bg-green-600/80 font-bold text-white shadow-[inset_0_0_10px_rgba(34,197,94,0.5)]' : 'bg-green-500/20 text-green-400';
+                      bgClass = status.isFirstBlood ? 'bg-green-900 border border-green-700 font-bold text-green-100 shadow-[inset_0_0_15px_rgba(0,255,0,0.15)]' : 'bg-green-500/15 text-green-400';
                       content = (
                         <div className="leading-tight flex flex-col items-center justify-center">
-                          <span className="text-sm">{status.attempts > 1 ? `+${status.attempts - 1}` : '+'}</span>
-                          <span className="text-[10px] opacity-80">{status.solveTime}m</span>
+                          {status.attempts > 1 && <span className="text-sm font-semibold">-{status.attempts - 1}</span>}
+                          <span className="text-[10px] opacity-80">
+                            {status.solveTimeSeconds !== undefined
+                              ? `${Math.floor(status.solveTimeSeconds / 60)}:${(status.solveTimeSeconds % 60).toString().padStart(2, '0')}`
+                              : `${status.solveTime}m`}
+                          </span>
                         </div>
                       );
                     } else if (status.status === 'frozen') {

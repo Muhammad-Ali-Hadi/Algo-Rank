@@ -3,6 +3,7 @@ const API_URL = import.meta.env.VITE_API_URL
   : 'http://localhost:5000/api';
 
 const cache = new Map();
+const abortControllers = new Map(); // Store tokens for active requests
 
 async function fetchWithAuth(endpoint, options = {}) {
   const token = localStorage.getItem('token');
@@ -14,6 +15,16 @@ async function fetchWithAuth(endpoint, options = {}) {
     if (cached && Date.now() - cached.timestamp < 5000) {
       return cached.data;
     }
+
+    // Cancel any rapidly preceding identical requests
+    if (abortControllers.has(endpoint)) {
+      abortControllers.get(endpoint).abort();
+    }
+  }
+
+  const controller = new AbortController();
+  if (isGet) {
+    abortControllers.set(endpoint, controller);
   }
 
   const headers = {
@@ -22,23 +33,34 @@ async function fetchWithAuth(endpoint, options = {}) {
     ...options.headers,
   };
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers,
+      signal: isGet ? controller.signal : undefined,
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || 'Request failed');
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Request failed' }));
+      throw new Error(error.error || 'Request failed');
+    }
+
+    const data = await response.json();
+
+    if (isGet) {
+      cache.set(endpoint, { timestamp: Date.now(), data });
+      abortControllers.delete(endpoint);
+    }
+
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      // Swallowing the abort exception ensures the UI doesn't visually crash
+      // or mistakenly jump into the finally / error handling phase
+      return new Promise(() => {});
+    }
+    throw err;
   }
-
-  const data = await response.json();
-
-  if (isGet) {
-    cache.set(endpoint, { timestamp: Date.now(), data });
-  }
-
-  return data;
 }
 
 export const api = {
