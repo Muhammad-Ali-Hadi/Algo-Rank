@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import Logo from "./Logo";
 
@@ -10,6 +11,7 @@ const API_URL = import.meta.env.VITE_API_URL
 
 export default function LoginCard() {
   const { signIn, signUp, commitAuth } = useAuth();
+  const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -278,7 +280,10 @@ export default function LoginCard() {
           icon: "signup",
         });
         // Redirect after short delay
-        setTimeout(() => commitAuth(), 400);
+        setTimeout(() => {
+          commitAuth();
+          navigate('/verify-email', { state: { email } });
+        }, 1500);
       } catch (err) {
         setValidationPopup({
           show: true,

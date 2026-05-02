@@ -1,30 +1,10 @@
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs'); // CHANGED: bcryptjs for secure password hashing
+const bcrypt = require('bcryptjs');
 const { supabaseAdmin } = require('../services/supabaseClient');
+const { initiateVerification } = require('./verificationController');
+const { generateToken, isAdminUser } = require('../utils/authUtils');
 
 const SALT_ROUNDS = 10; // NEW: bcrypt cost factor
-
-const JWT_SECRET = process.env.JWT_SECRET || 'algorank-secret-key';
-
-// Helper to determine if a user is an admin
-function isAdminUser(email, username) {
-  const adminEmail = (process.env.EMAIL_USER || '').toLowerCase();
-  return (
-    email.toLowerCase() === adminEmail ||
-    username.toLowerCase() === 'adminteam'
-  );
-}
-
-// Generate JWT token for a user
-function generateToken(user) {
-  const isAdmin = isAdminUser(user.email, user.username);
-  return jwt.sign(
-    { id: user.id, email: user.email, username: user.username, isAdmin },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
-}
 
 // ==================== SIGNUP ====================
 const signup = async (req, res) => {
@@ -66,22 +46,46 @@ const signup = async (req, res) => {
 
     // Insert directly into public.users
     const userId = crypto.randomUUID();
-    const { data: newUser, error: insertError } = await supabaseAdmin
+    const userData = {
+      id: userId,
+      email: email.toLowerCase(),
+      username: username.toLowerCase(),
+      password: hashedPassword,
+      name: name,
+      avatar_url: '',
+      is_verified: false // We try to include it
+    };
+
+    let { data: newUser, error: insertError } = await supabaseAdmin
       .from('users')
-      .insert({
-        id: userId,
-        email: email.toLowerCase(),
-        username: username.toLowerCase(),
-        password: hashedPassword, // CHANGED: store hashed password instead of plain text
-        name: name,
-        avatar_url: ''
-      })
+      .insert(userData)
       .select()
       .single();
+
+    // FALLBACK: If column is missing, try inserting without it
+    if (insertError && insertError.message.includes('column "is_verified"')) {
+      console.warn('Database is missing is_verified column. Falling back to standard signup.');
+      delete userData.is_verified;
+      const retry = await supabaseAdmin
+        .from('users')
+        .insert(userData)
+        .select()
+        .single();
+      newUser = retry.data;
+      insertError = retry.error;
+    }
 
     if (insertError) {
       console.error('Insert error:', insertError);
       return res.status(500).json({ error: 'Failed to create account: ' + insertError.message });
+    }
+
+    // Send verification OTP
+    try {
+      await initiateVerification(email.toLowerCase());
+    } catch (emailErr) {
+      console.error('Failed to send verification email:', emailErr);
+      // We don't fail signup if email fails, but we should probably warn
     }
 
     // Generate JWT
@@ -97,7 +101,8 @@ const signup = async (req, res) => {
         name: newUser.name,
         avatar_url: newUser.avatar_url,
         created_at: newUser.created_at,
-        isAdmin: isAdminUser(newUser.email, newUser.username)
+        isAdmin: isAdminUser(newUser.email, newUser.username),
+        isVerified: !!newUser.is_verified
       }
     });
 
@@ -159,7 +164,8 @@ const signin = async (req, res) => {
         name: user.name,
         avatar_url: user.avatar_url,
         created_at: user.created_at,
-        isAdmin: isAdminUser(user.email, user.username)
+        isAdmin: isAdminUser(user.email, user.username),
+        isVerified: !!user.is_verified
       }
     });
 
@@ -183,7 +189,7 @@ const getProfile = async (req, res) => {
     }
 
     const isAdmin = isAdminUser(data.email, data.username);
-    return res.status(200).json({ user: { ...data, isAdmin } });
+    return res.status(200).json({ user: { ...data, isAdmin, isVerified: !!data.is_verified } });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

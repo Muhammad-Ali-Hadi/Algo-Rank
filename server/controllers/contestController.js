@@ -668,7 +668,7 @@ const submitSolution = async (req, res) => {
     // Fire off async evaluation in background (don't await — return immediately)
     if (code_text) {
       const { evaluateSubmission } = require('../services/judgeService');
-      evaluateSubmission(submission.id, contestProblem.problem_title, code_text, language)
+      evaluateSubmission(submission.id, contestProblem.id, contestProblem.problem_title, code_text, language)
         .then(() => invalidate(KEYS.leaderboard(id)))
         .catch(err => console.error('[SubmitSolution] Background evaluation failed:', err));
     }

@@ -1,35 +1,48 @@
-# AlgoRank Project Brief
+# AlgoRank Project Brief 🚀
 
-AlgoRank is a modern competitive programming platform (a cleaner VJudge-style clone) built with a React + Tailwind + Framer Motion frontend and a Node/Express backend. It uses Supabase (PostgreSQL) for data storage and Supabase Auth (Google OAuth) for authentication.
+AlgoRank is a premium competitive programming platform built to provide a high-end experience for problem-solving and live contests. It bridges the gap between practice and competition with real-time judging and advanced leaderboard mechanics.
 
-## Tech Stack
+## 🛠️ Tech Stack
 
-- Frontend: React (Vite), Tailwind CSS, Framer Motion
-- Backend: Node.js, Express.js
-- Database: Supabase (PostgreSQL)
-- Auth: Supabase Auth (Google OAuth)
+- **Frontend:** React 18 (Vite), Vanilla CSS (Custom Design System), Framer Motion
+- **Backend:** Node.js, Express.js, JWT Authentication
+- **Database:** Supabase (PostgreSQL)
+- **Email:** Nodemailer (Gmail SMTP)
+- **Judging:** Judge0 API
 
-## Structure
+## 🏛️ Project Architecture
 
-- client/: React app with pages, components, animations, hooks, and services
-- server/: Express API with routes, controllers, middleware, and Supabase client
-- schema.sql: database schema
+- **client/**: Responsive React application featuring:
+  - **animations/**: 3D perspective grids and particle animations.
+  - **components/**: Modular UI (LoginCard, Navbar, Leaderboard).
+  - **pages/**: Core views (Dashboard, Contests, Profile, Verification).
+  - **services/**: API integration layer.
+- **server/**: Secure REST API featuring:
+  - **controllers/**: Business logic for Auth, Contests, and Judging.
+  - **middleware/**: Security layers for Admin, Auth, and Email Verification.
+  - **services/**: Integration with Email and Supabase.
+- **schema.sql**: Complete database schema and migrations.
 
-## Dev Commands
+## ⚙️ Core Functionalities
 
-- Client: `cd client && npm install && npm run dev`
-- Server: `cd server && npm install && npm run dev`
+1.  **Security First:** Custom Email/Password auth with mandatory OTP verification.
+2.  **Live Contests:** Support for Global and Local (private) contests.
+3.  **Real-time Leaderboard:** Accurate score tracking with 20-minute penalty logic and scoreboard freeze.
+4.  **Integrated Judging:** Direct code submission to Judge0 for instant feedback.
+5.  **History & Profile:** Detailed contest history and customizable profile settings.
 
-## Environment Variables
+## 🚀 Quick Start
 
-Server (.env):
-- PORT
-- SUPABASE_URL
-- SUPABASE_ANON_KEY
-- SUPABASE_SERVICE_ROLE_KEY
-- CLIENT_URL
+- **Client:** `cd client && npm install && npm run dev` (Runs on port 5173)
+- **Server:** `cd server && npm install && npm run dev` (Runs on port 5000)
 
-Client (.env):
-- VITE_SUPABASE_URL
-- VITE_SUPABASE_ANON_KEY
-- VITE_API_URL
+## 🔑 Required Environment Variables
+
+### Server:
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+- `JWT_SECRET`
+- `EMAIL_USER`, `EMAIL_PASS` (Gmail App Password)
+- `JUDGE0_API_URL`
+
+### Client:
+- `VITE_API_URL`

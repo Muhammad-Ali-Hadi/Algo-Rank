@@ -64,7 +64,7 @@ const forgotPassword = async (req, res) => {
     });
 
     // Send OTP email
-    await sendOTPEmail(email.toLowerCase(), otp);
+    await sendOTPEmail(email.toLowerCase(), otp, 'Password Reset');
 
     return res.status(200).json({
       message: 'OTP sent to your email. It expires in 5 minutes.',
