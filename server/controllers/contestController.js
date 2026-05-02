@@ -287,6 +287,7 @@ const getContestById = async (req, res) => {
       contest,
       problems: problems || [],
       participants: participantDetails,
+      server_time: new Date().toISOString(),
     });
   } catch (err) {
     console.error('Get contest by id exception:', err);
@@ -726,16 +727,19 @@ const getLeaderboard = async (req, res) => {
         if (prob.status === 'accepted') continue; // already solved
 
         prob.attempts++;
+        const startTime = new Date(contest.start_time);
+        const solveTimeMins = Math.max(0, Math.floor((new Date(sub.submitted_at) - startTime) / 60000));
+        const solveTimeSecs = Math.max(0, Math.floor((new Date(sub.submitted_at) - startTime) / 1000));
+
+        // Always store the metadata for the most recent un-accepted submission
+        prob.solveTime = solveTimeMins;
+        prob.solveTimeSeconds = solveTimeSecs;
 
         if (sub.status === 'accepted') {
           prob.status = 'accepted';
           userStats[uid].solved++;
           // Penalty: minutes from contest start + 20min per wrong attempt
-          const startTime = new Date(contest.start_time);
-          const solveTimeMins = Math.max(0, Math.floor((new Date(sub.submitted_at) - startTime) / 60000));
-
           userStats[uid].penalty += solveTimeMins + (prob.attempts - 1) * 20;
-          prob.solveTime = solveTimeMins;
 
           // Mark first blood
           if (firstBloods[problemKey] === uid) {

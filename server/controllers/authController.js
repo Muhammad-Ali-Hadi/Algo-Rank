@@ -28,11 +28,15 @@ function generateToken(user) {
 
 // ==================== SIGNUP ====================
 const signup = async (req, res) => {
-  const { email, password, username, name } = req.body;
+  let { email, password, username, name } = req.body;
 
   if (!email || !password || !username || !name) {
     return res.status(400).json({ error: 'All fields are required' });
   }
+
+  email = email.trim();
+  username = username.trim();
+  name = name.trim();
 
   try {
     // Check if email already exists
@@ -105,11 +109,13 @@ const signup = async (req, res) => {
 
 // ==================== SIGNIN ====================
 const signin = async (req, res) => {
-  const { identifier, password } = req.body;
+  let { identifier, password } = req.body;
 
   if (!identifier || !password) {
     return res.status(400).json({ error: 'Username/email and password are required' });
   }
+
+  identifier = identifier.trim();
 
   try {
     // Look up user by email or username

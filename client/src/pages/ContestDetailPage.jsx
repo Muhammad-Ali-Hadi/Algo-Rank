@@ -54,12 +54,13 @@ export default function ContestDetailPage() {
   
   const [activeTab, setActiveTab] = useState('problems');
   const [now, setNow] = useState(new Date());
+  const [serverTimeOffset, setServerTimeOffset] = useState(0);
 
   // Timer effect
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date(Date.now() + serverTimeOffset)), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [serverTimeOffset]);
 
   useEffect(() => {
     fetchContest();
@@ -83,6 +84,9 @@ export default function ContestDetailPage() {
       setContest(data.contest);
       setProblems(data.problems || []);
       setParticipants(data.participants || []);
+      if (data.server_time) {
+        setServerTimeOffset(new Date(data.server_time).getTime() - Date.now());
+      }
     } catch (err) {
       setError(err.message || 'Failed to load contest');
     } finally {
