@@ -1,4 +1,5 @@
 const { supabaseAdmin } = require('../services/supabaseClient');
+const { getOrSet } = require('../services/cacheService');
 
 // ==================== GET PROBLEMS (PAGINATED) ====================
 const getProblems = async (req, res) => {
@@ -10,25 +11,30 @@ const getProblems = async (req, res) => {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    // Fetch problems with pagination count
-    const { data: problems, error, count } = await supabaseAdmin
-      .from('problems')
-      .select('id, title, difficulty, time_limit, memory_limit, created_at', { count: 'exact' })
-      .order('created_at', { ascending: true })
-      .range(from, to);
+    // Cache paginated problem grids for up to 30 seconds to obliterate 700ms cold boots
+    const cacheKey = `problems:page${page}:limit${limit}`;
+    const payload = await getOrSet(cacheKey, 30, async () => {
+      // Fetch problems with pagination count
+      const { data: problems, error, count } = await supabaseAdmin
+        .from('problems')
+        .select('id, title, difficulty, time_limit, memory_limit, created_at', { count: 'exact' })
+        .order('created_at', { ascending: true })
+        .range(from, to);
 
-    if (error) {
-      console.error('Get problems error:', error);
-      return res.status(500).json({ error: 'Failed to fetch problems' });
-    }
+      if (error) {
+        throw new Error('Failed to fetch problems from database');
+      }
 
-    return res.status(200).json({
-      problems: problems || [],
-      total: count || 0,
-      page,
-      limit,
-      totalPages: count ? Math.ceil(count / limit) : 0
+      return {
+        problems: problems || [],
+        total: count || 0,
+        page,
+        limit,
+        totalPages: count ? Math.ceil(count / limit) : 0
+      };
     });
+
+    return res.status(200).json(payload);
   } catch (err) {
     console.error('Get problems exception:', err);
     return res.status(500).json({ error: 'Internal server error' });

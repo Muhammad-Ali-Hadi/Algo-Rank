@@ -26,6 +26,8 @@ export default function CreateContestPage() {
     start_time: '',
     end_time: '',
     duration_seconds: 0,
+    freeze_duration: 0,
+    unfreeze_duration: 0,
   });
 
   // Local contest form
@@ -34,12 +36,18 @@ export default function CreateContestPage() {
     visibility: 'public',
     start_time: '',
     duration_seconds: 3600,
+    freeze_duration: 0,
+    unfreeze_duration: 0,
   });
 
   // Problems (shared)
   const [problems, setProblems] = useState([{ title: '', id: null }]);
   const [availableProblems, setAvailableProblems] = useState([]);
   const [focusedIndex, setFocusedIndex] = useState(null);
+
+  // Freeze Checkboxes
+  const [enableGlobalFreeze, setEnableGlobalFreeze] = useState(false);
+  const [enableLocalFreeze, setEnableLocalFreeze] = useState(false);
 
   // Fetch problems for autocomplete
 
@@ -104,7 +112,8 @@ export default function CreateContestPage() {
           ...globalForm,
           start_time: globalForm.start_time ? new Date(globalForm.start_time).toISOString() : null,
           end_time: globalForm.end_time ? new Date(globalForm.end_time).toISOString() : null,
-          freeze_time: globalForm.freeze_time ? new Date(globalForm.freeze_time).toISOString() : null,
+          freeze_time: enableGlobalFreeze && globalForm.freeze_duration >= 0 && globalForm.start_time ? new Date(new Date(globalForm.start_time).getTime() + globalForm.freeze_duration * 60000).toISOString() : null,
+          unfreeze_time: enableGlobalFreeze && globalForm.unfreeze_duration >= 0 && globalForm.end_time ? new Date(new Date(globalForm.end_time).getTime() + globalForm.unfreeze_duration * 60000).toISOString() : null,
           problems: validProblems,
         }),
       });
@@ -143,7 +152,8 @@ export default function CreateContestPage() {
         body: JSON.stringify({
           ...localForm,
           start_time: localForm.start_time ? new Date(localForm.start_time).toISOString() : null,
-          freeze_time: localForm.freeze_time ? new Date(localForm.freeze_time).toISOString() : null,
+          freeze_time: enableLocalFreeze && localForm.freeze_duration >= 0 && localForm.start_time ? new Date(new Date(localForm.start_time).getTime() + localForm.freeze_duration * 60000).toISOString() : null,
+          unfreeze_time: enableLocalFreeze && localForm.unfreeze_duration >= 0 && localForm.start_time ? new Date(new Date(localForm.start_time).getTime() + localForm.duration_seconds * 1000 + localForm.unfreeze_duration * 60000).toISOString() : null,
           problems: validProblems,
         }),
       });
@@ -265,14 +275,42 @@ export default function CreateContestPage() {
                 />
               </div>
 
-              <div>
-                <label className="neon-label">Freeze Time (Optional)</label>
-                <input
-                  type="datetime-local"
-                  className="neon-input"
-                  value={globalForm.freeze_time || ''}
-                  onChange={(e) => setGlobalForm({ ...globalForm, freeze_time: e.target.value })}
-                />
+              <div className="neon-card p-4 bg-white/[0.01]">
+                <label className="flex items-center gap-2 text-sm text-foreground mb-4 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={enableGlobalFreeze} 
+                    onChange={(e) => setEnableGlobalFreeze(e.target.checked)} 
+                    className="w-4 h-4 text-primary bg-transparent border border-white/20 rounded accent-primary" 
+                  />
+                  <span className="font-semibold text-lg">Enable Scoreboard Freeze</span>
+                </label>
+
+                {enableGlobalFreeze && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-l-2 border-primary/30 pl-4 py-2">
+                    <div>
+                      <label className="neon-label">Freeze Start (Mins after Contest Start)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="neon-input"
+                        value={globalForm.freeze_duration === 0 ? '0' : globalForm.freeze_duration || ''}
+                        onChange={(e) => setGlobalForm({ ...globalForm, freeze_duration: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="neon-label">Unfreeze (Mins after Contest End)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="neon-input"
+                        value={globalForm.unfreeze_duration === 0 ? '0' : globalForm.unfreeze_duration || ''}
+                        onChange={(e) => setGlobalForm({ ...globalForm, unfreeze_duration: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -425,16 +463,44 @@ export default function CreateContestPage() {
                   required
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="neon-label">Freeze Time (Optional)</label>
-                <input
-                  type="datetime-local"
-                  className="neon-input"
-                  value={localForm.freeze_time || ''}
-                  onChange={(e) => setLocalForm({ ...localForm, freeze_time: e.target.value })}
+            <div className="neon-card p-4 bg-white/[0.01]">
+              <label className="flex items-center gap-2 text-sm text-foreground mb-4 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={enableLocalFreeze} 
+                  onChange={(e) => setEnableLocalFreeze(e.target.checked)} 
+                  className="w-4 h-4 text-primary bg-transparent border border-white/20 rounded accent-primary" 
                 />
-              </div>
+                <span className="font-semibold text-lg">Enable Scoreboard Freeze</span>
+              </label>
+
+              {enableLocalFreeze && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-l-2 border-primary/30 pl-4 py-2">
+                  <div>
+                    <label className="neon-label">Freeze Start (Mins after Contest Start)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="neon-input"
+                      value={localForm.freeze_duration === 0 ? '0' : localForm.freeze_duration || ''}
+                      onChange={(e) => setLocalForm({ ...localForm, freeze_duration: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="neon-label">Unfreeze (Mins after Contest End)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="neon-input"
+                      value={localForm.unfreeze_duration === 0 ? '0' : localForm.unfreeze_duration || ''}
+                      onChange={(e) => setLocalForm({ ...localForm, unfreeze_duration: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {localForm.visibility === 'private' && (

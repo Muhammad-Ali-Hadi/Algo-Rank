@@ -1,5 +1,18 @@
 const crypto = require('crypto');
 const { supabaseAdmin } = require('../services/supabaseClient');
+
+const aliasCache = new Map();
+
+// Resolves a short_id (6-digit numeric invite_code) back to a UUID, transparently.
+const resolveContestId = async (idOrCode) => {
+  if (!idOrCode) return null;
+  if (idOrCode.length === 36) return idOrCode; // Standard UUID
+  if (aliasCache.has(idOrCode)) return aliasCache.get(idOrCode);
+  const { data } = await supabaseAdmin.from('contests').select('id').eq('invite_code', idOrCode).single();
+  if (!data) throw new Error('Contest code not found or invalid.');
+  aliasCache.set(idOrCode, data.id);
+  return data.id;
+};
 const { getOrSet, invalidate, invalidatePattern, KEYS } = require('../services/cacheService');
 const { scrapeProblem: scrapeFromUrl } = require('../services/scraperService');
 
@@ -81,7 +94,7 @@ const processProblemsForContest = async (contestId, problemsArray) => {
 
 // ==================== CREATE GLOBAL CONTEST (Admin Only) ====================
 const createGlobalContest = async (req, res) => {
-  const { name, description, start_time, end_time, duration_seconds, problems, freeze_time } = req.body;
+  const { name, description, start_time, end_time, duration_seconds, problems, freeze_time, unfreeze_time } = req.body;
 
   if (!name || !start_time || !end_time) {
     return res.status(400).json({ error: 'Name, start time, and end time are required' });
@@ -93,21 +106,34 @@ const createGlobalContest = async (req, res) => {
   }
 
   try {
-    const { data: contest, error: contestError } = await supabaseAdmin
+    const invite_code = Math.floor(100000 + Math.random() * 900000).toString();
+    const contestPayload = {
+      name,
+      description: description || '',
+      type: 'global',
+      visibility: 'public',
+      start_time,
+      end_time,
+      duration_seconds: duration_seconds || null,
+      creator_id: req.user.id,
+      freeze_time: freeze_time || null,
+      invite_code,
+    };
+
+    if (unfreeze_time !== undefined) contestPayload.unfreeze_time = unfreeze_time;
+
+    let { data: contest, error: contestError } = await supabaseAdmin
       .from('contests')
-      .insert({
-        name,
-        description: description || '',
-        type: 'global',
-        visibility: 'public',
-        start_time,
-        end_time,
-        duration_seconds: duration_seconds || null,
-        creator_id: req.user.id,
-        freeze_time: freeze_time || null,
-      })
+      .insert(contestPayload)
       .select()
       .single();
+
+    if (contestError && contestError.message && contestError.message.includes('unfreeze_time')) {
+      delete contestPayload.unfreeze_time;
+      const retry = await supabaseAdmin.from('contests').insert(contestPayload).select().single();
+      contest = retry.data;
+      contestError = retry.error;
+    }
 
     if (contestError) {
       console.error('Create global contest error:', contestError);
@@ -127,7 +153,7 @@ const createGlobalContest = async (req, res) => {
 
 // ==================== CREATE LOCAL CONTEST (Any User) ====================
 const createLocalContest = async (req, res) => {
-  const { name, visibility, start_time, duration_seconds, problems } = req.body;
+  const { name, visibility, start_time, duration_seconds, problems, unfreeze_time } = req.body;
 
   if (!name || !start_time || !duration_seconds) {
     return res.status(400).json({ error: 'Name, start time, and duration are required' });
@@ -139,27 +165,40 @@ const createLocalContest = async (req, res) => {
   }
 
   try {
-    const invite_code = visibility === 'private' ? crypto.randomBytes(6).toString('hex') : null;
+    // Always assign a short numeric ID to all contests now for URL mapping
+    const invite_code = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Calculate end_time from start_time + duration_seconds
     const startDate = new Date(start_time);
     const endDate = new Date(startDate.getTime() + duration_seconds * 1000);
 
-    const { data: contest, error: contestError } = await supabaseAdmin
+    const contestPayload = {
+      name,
+      description: '',
+      type: 'local',
+      visibility: visibility || 'public',
+      start_time,
+      end_time: endDate.toISOString(),
+      duration_seconds,
+      creator_id: req.user.id,
+      freeze_time: req.body.freeze_time || null,
+      invite_code,
+    };
+
+    if (unfreeze_time !== undefined) contestPayload.unfreeze_time = unfreeze_time;
+
+    let { data: contest, error: contestError } = await supabaseAdmin
       .from('contests')
-      .insert({
-        name,
-        description: '',
-        type: 'local',
-        visibility: visibility || 'public',
-        start_time,
-        end_time: endDate.toISOString(),
-        duration_seconds,
-        creator_id: req.user.id,
-        invite_code,
-      })
+      .insert(contestPayload)
       .select()
       .single();
+
+    if (contestError && contestError.message && contestError.message.includes('unfreeze_time')) {
+      delete contestPayload.unfreeze_time;
+      const retry = await supabaseAdmin.from('contests').insert(contestPayload).select().single();
+      contest = retry.data;
+      contestError = retry.error;
+    }
 
     if (contestError) {
       console.error('Create local contest error:', contestError);
@@ -185,23 +224,21 @@ const createLocalContest = async (req, res) => {
 // ==================== GET CONTESTS ====================
 const getContests = async (req, res) => {
   try {
-    // Get all global contests + public local contests + user's private contests
-    const { data: contests, error } = await supabaseAdmin
-      .from('contests')
-      .select('*, contest_participants(count)')
-      .or(`type.eq.global,visibility.eq.public,creator_id.eq.${req.user.id}`)
-      .order('start_time', { ascending: false });
+    // Fire global fetch and joined fetch concurrently
+    const [contestsRes, joinedRes] = await Promise.all([
+      supabaseAdmin
+        .from('contests')
+        .select('*, contest_participants(count)')
+        .or(`type.eq.global,visibility.eq.public,creator_id.eq.${req.user.id}`)
+        .order('start_time', { ascending: false }),
+      supabaseAdmin
+        .from('contest_participants')
+        .select('contest_id')
+        .eq('user_id', req.user.id)
+    ]);
 
-    if (error) {
-      console.error('Get contests error:', error);
-      return res.status(500).json({ error: 'Failed to fetch contests' });
-    }
-
-    // Also get contests the user has joined
-    const { data: joinedContestIds } = await supabaseAdmin
-      .from('contest_participants')
-      .select('contest_id')
-      .eq('user_id', req.user.id);
+    const { data: contests, error } = contestsRes;
+    const { data: joinedContestIds } = joinedRes;
 
     const joinedIds = (joinedContestIds || []).map(j => j.contest_id);
     let allContestIds = contests.map(c => c.id);
@@ -229,65 +266,60 @@ const getContests = async (req, res) => {
 
 // ==================== GET CONTEST BY ID ====================
 const getContestById = async (req, res) => {
-  const { id } = req.params;
-
   try {
-    const { data: contest, error } = await supabaseAdmin
-      .from('contests')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const { id: rawId } = req.params;
+    const id = await resolveContestId(rawId);
+    const includeContent = req.query.includeProblemsContent === 'true';
+    const problemSelectString = includeContent ? '*' : 'id, contest_id, problem_title, problem_url, order_index, scraped_at';
 
-    if (error || !contest) {
+    // Run independent database reads concurrently
+    const [contestRes, problemsRes, participantsRes] = await Promise.all([
+      supabaseAdmin.from('contests').select('*').eq('id', id).single(),
+      supabaseAdmin.from('contest_problems').select(problemSelectString).eq('contest_id', id).order('order_index', { ascending: true }),
+      supabaseAdmin.from('contest_participants').select('user_id, joined_at').eq('contest_id', id)
+    ]);
+
+    const contest = contestRes.data;
+    const problems = problemsRes.data;
+    const participants = participantsRes.data;
+
+    if (contestRes.error || !contest) {
       return res.status(404).json({ error: 'Contest not found' });
     }
 
     // Check access for private contests
     if (contest.visibility === 'private' && contest.creator_id !== req.user.id) {
-      const { data: participation } = await supabaseAdmin
-        .from('contest_participants')
-        .select('id')
-        .eq('contest_id', id)
-        .eq('user_id', req.user.id)
-        .single();
-
-      if (!participation) {
+      const isParticipant = (participants || []).some(p => p.user_id === req.user.id);
+      if (!isParticipant) {
         return res.status(403).json({ error: 'You do not have access to this private contest' });
       }
     }
 
-    // Get problems
-    const { data: problems } = await supabaseAdmin
-      .from('contest_problems')
-      .select('*')
-      .eq('contest_id', id)
-      .order('order_index', { ascending: true });
-
-    // Get participants with user info
-    const { data: participants } = await supabaseAdmin
-      .from('contest_participants')
-      .select('user_id, joined_at')
-      .eq('contest_id', id);
-
     let participantDetails = [];
     if (participants && participants.length > 0) {
-      const userIds = participants.map(p => p.user_id);
-      const { data: users } = await supabaseAdmin
-        .from('users')
-        .select('id, username, name, avatar_url')
-        .in('id', userIds);
+      const uids = participants.map(p => p.user_id);
+      const { data: users } = await supabaseAdmin.from('users').select('id, username, name, avatar_url').in('id', uids);
+      participantDetails = participants.map(p => ({
+        ...p,
+        user: (users || []).find(u => u.id === p.user_id) || null
+      }));
+    }
 
-      participantDetails = participants.map(p => {
-        const user = (users || []).find(u => u.id === p.user_id);
-        return { ...p, user: user || null };
-      });
+    // Shield problem details securely if the contest hasn't launched yet
+    const nowServer = new Date();
+    const isUpcoming = new Date(contest.start_time) > nowServer;
+    const isCreatorOrAdmin = contest.creator_id === req.user.id || req.user.isAdmin;
+    
+    let visibleProblems = problems || [];
+    if (isUpcoming && !isCreatorOrAdmin) {
+      visibleProblems = [];
     }
 
     return res.status(200).json({
       contest,
-      problems: problems || [],
+      problems: visibleProblems,
       participants: participantDetails,
-      server_time: new Date().toISOString(),
+      server_time: nowServer.toISOString(),
     });
   } catch (err) {
     console.error('Get contest by id exception:', err);
@@ -297,17 +329,18 @@ const getContestById = async (req, res) => {
 
 // ==================== UPDATE CONTEST ====================
 const updateContest = async (req, res) => {
-  const { id } = req.params;
-  const { name, description, start_time, end_time, duration_seconds, visibility, freeze_time, problems } = req.body;
-
-  if (problems !== undefined) {
-    const duplicateError = validateUniqueProblems(problems);
-    if (duplicateError) {
-      return res.status(400).json({ error: duplicateError });
-    }
-  }
-
   try {
+    const { id: rawId } = req.params;
+    const id = await resolveContestId(rawId);
+    const { name, description, start_time, end_time, duration_seconds, visibility, freeze_time, unfreeze_time, problems } = req.body;
+
+    if (problems !== undefined) {
+      const duplicateError = validateUniqueProblems(problems);
+      if (duplicateError) {
+        return res.status(400).json({ error: duplicateError });
+      }
+    }
+
     // Check ownership or admin
     const { data: contest, error: fetchErr } = await supabaseAdmin
       .from('contests')
@@ -329,10 +362,12 @@ const updateContest = async (req, res) => {
     if (description !== undefined) updates.description = description;
 
     if (start_time !== undefined) {
-      if (new Date() < new Date(contest.start_time)) {
-        updates.start_time = start_time;
-      } else {
-        return res.status(400).json({ error: 'Cannot change start time of an active or past contest' });
+      if (new Date(start_time).getTime() !== new Date(contest.start_time).getTime()) {
+        if (new Date() < new Date(contest.start_time)) {
+          updates.start_time = start_time;
+        } else {
+          return res.status(400).json({ error: 'Cannot change start time of an active or past contest' });
+        }
       }
     }
 
@@ -340,23 +375,53 @@ const updateContest = async (req, res) => {
     if (duration_seconds !== undefined) updates.duration_seconds = duration_seconds;
     if (visibility !== undefined) updates.visibility = visibility;
     if (freeze_time !== undefined) updates.freeze_time = freeze_time;
+    if (unfreeze_time !== undefined) updates.unfreeze_time = unfreeze_time;
 
-    const { data: updated, error: updateErr } = await supabaseAdmin
+    let { data: updated, error: updateErr } = await supabaseAdmin
       .from('contests')
       .update(updates)
       .eq('id', id)
       .select()
       .single();
 
+    if (updateErr && updateErr.message && updateErr.message.includes('unfreeze_time')) {
+      delete updates.unfreeze_time;
+      const retry = await supabaseAdmin.from('contests').update(updates).eq('id', id).select().single();
+      updated = retry.data;
+      updateErr = retry.error;
+    }
+
     if (updateErr) {
+      console.error('Update contest error payload:', updateErr);
       return res.status(500).json({ error: 'Failed to update contest' });
     }
 
-    // Update problems if provided
+    // Update problems if provided, rigorously preserving UUIDs to retain active submissions
     if (problems !== undefined) {
-      // Delete existing problems and re-insert
-      await supabaseAdmin.from('contest_problems').delete().eq('contest_id', id);
-      await processProblemsForContest(id, problems);
+      const { data: existingCP } = await supabaseAdmin.from('contest_problems').select('id, problem_title').eq('contest_id', id);
+      const existingMap = new Map((existingCP || []).map(p => [p.problem_title.toLowerCase(), p.id]));
+      
+      const payloadTitles = problems.map(p => p.title.toLowerCase());
+      
+      const toDelete = (existingCP || []).filter(cp => !payloadTitles.includes(cp.problem_title.toLowerCase())).map(cp => cp.id);
+      if (toDelete.length > 0) {
+        await supabaseAdmin.from('contest_problems').delete().in('id', toDelete);
+      }
+      
+      const newProblems = problems.filter(p => !existingMap.has(p.title.toLowerCase()));
+      if (newProblems.length > 0) {
+        // Find existing database rows to pull `description` accurately for new elements
+        await processProblemsForContest(id, newProblems);
+      }
+      
+      // Iterate entire array to fix alignment configurations safely without database row deletions
+      for (let i = 0; i < problems.length; i++) {
+        const p = problems[i];
+        const existingId = existingMap.get(p.title.toLowerCase());
+        if (existingId) {
+          await supabaseAdmin.from('contest_problems').update({ order_index: i }).eq('id', existingId);
+        }
+      }
     }
 
     invalidate(KEYS.contest(id));
@@ -372,9 +437,9 @@ const updateContest = async (req, res) => {
 
 // ==================== DELETE CONTEST ====================
 const deleteContest = async (req, res) => {
-  const { id } = req.params;
-
   try {
+    const { id: rawId } = req.params;
+    const id = await resolveContestId(rawId);
     const { data: contest, error: fetchErr } = await supabaseAdmin
       .from('contests')
       .select('creator_id')
@@ -410,9 +475,10 @@ const deleteContest = async (req, res) => {
 
 // ==================== JOIN CONTEST ====================
 const joinContest = async (req, res) => {
-  const { id } = req.params;
-
   try {
+    const { id: rawId } = req.params;
+    const id = await resolveContestId(rawId);
+
     const { data: contest, error: contestError } = await supabaseAdmin
       .from('contests')
       .select('id, visibility, creator_id')
@@ -537,7 +603,8 @@ const scrapeProblemHandler = async (req, res) => {
 
 // ==================== SUBMIT SOLUTION ====================
 const submitSolution = async (req, res) => {
-  const { id } = req.params; // contest_id
+  const { id: rawId } = req.params; // contest_id
+  const id = await resolveContestId(rawId);
   const { problem_id, language, code_text, solution_url } = req.body;
 
   if (!problem_id || !language) {
@@ -638,29 +705,20 @@ const getSubmissionStatus = async (req, res) => {
 
 // ==================== GET LEADERBOARD ====================
 const getLeaderboard = async (req, res) => {
-  const { id } = req.params;
-
   try {
+    const { id: rawId } = req.params;
+    const id = await resolveContestId(rawId);
     const cachedData = await getOrSet(KEYS.leaderboard(id), 10, async () => {
-      // Get contest info for freeze time
-      const { data: contest } = await supabaseAdmin
-        .from('contests')
-        .select('freeze_time, start_time, end_time')
-        .eq('id', id)
-        .single();
+      // Run independent data reads concurrently without strictly mapping unfreeze_time explicitly directly to prevent fatal crashes if column missing
+      const [contestRes, submissionsRes, participantsRes] = await Promise.all([
+        supabaseAdmin.from('contests').select('*').eq('id', id).single(),
+        supabaseAdmin.from('submissions').select('*, contest_problems(order_index, problem_title)').eq('contest_id', id).order('submitted_at', { ascending: true }),
+        supabaseAdmin.from('contest_participants').select('user_id').eq('contest_id', id)
+      ]);
 
-      // Get all submissions for this contest
-      const { data: submissions } = await supabaseAdmin
-        .from('submissions')
-        .select('*, contest_problems(order_index, problem_title)')
-        .eq('contest_id', id)
-        .order('submitted_at', { ascending: true });
-
-      // Get participants
-      const { data: participants } = await supabaseAdmin
-        .from('contest_participants')
-        .select('user_id')
-        .eq('contest_id', id);
+      const contest = contestRes.data;
+      const submissions = submissionsRes.data;
+      const participants = participantsRes.data;
 
       if (!participants) {
         return { leaderboard: [], frozen: false };
@@ -675,7 +733,9 @@ const getLeaderboard = async (req, res) => {
 
       const now = new Date();
       const freezeTime = contest?.freeze_time ? new Date(contest.freeze_time) : null;
-      const isFrozen = freezeTime && now >= freezeTime;
+      const unfreezeTime = contest?.unfreeze_time ? new Date(contest.unfreeze_time) : null;
+      
+      const isFrozen = freezeTime && now >= freezeTime && (!unfreezeTime || now < unfreezeTime);
 
       // Build leaderboard: count accepted problems per user, track penalty time
       // Build user stats
@@ -750,9 +810,11 @@ const getLeaderboard = async (req, res) => {
         }
       }
 
-      // Sort: most solved desc, then least penalty asc
-      const leaderboard = Object.values(userStats)
-        .sort((a, b) => b.solved - a.solved || a.penalty - b.penalty)
+      // Filter out participants who haven't made any submissions
+      let leaderboard = Object.values(userStats).filter(u => Object.keys(u.problems).length > 0);
+
+      // Sort by solved (desc), then penalty (asc)
+      leaderboard = leaderboard.sort((a, b) => b.solved - a.solved || a.penalty - b.penalty)
         .map((entry, rank) => ({ ...entry, rank: rank + 1 }));
 
       return { leaderboard, frozen: isFrozen };

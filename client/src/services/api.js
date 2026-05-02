@@ -74,7 +74,7 @@ export const api = {
 
   // Contest APIs
   getContests: () => fetchWithAuth('/contests'),
-  getContestById: (id) => fetchWithAuth(`/contests/${id}`),
+  getContestById: (id, includeProblemsContent = false) => fetchWithAuth(`/contests/${id}${includeProblemsContent ? '?includeProblemsContent=true' : ''}`),
   createGlobalContest: (data) =>
     fetchWithAuth('/contests/global', {
       method: 'POST',

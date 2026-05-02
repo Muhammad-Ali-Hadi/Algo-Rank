@@ -30,12 +30,15 @@ export default function EditContestPage() {
     duration_seconds: 3600,
     start_time: '',
     end_time: '',
-    freeze_time: '',
+    freeze_duration: 0,
+    unfreeze_duration: 0,
   });
   
   const [problems, setProblems] = useState([]);
   const [availableProblems, setAvailableProblems] = useState([]);
   const [focusedIndex, setFocusedIndex] = useState(null);
+
+  const [enableFreeze, setEnableFreeze] = useState(false);
 
   useEffect(() => {
     const fetchContest = async () => {
@@ -50,6 +53,12 @@ export default function EditContestPage() {
         }
 
         setContest(c);
+        const start_ms = new Date(c.start_time).getTime();
+        const end_ms = c.end_time ? new Date(c.end_time).getTime() : start_ms + (c.duration_seconds || 0) * 1000;
+        
+        const freeze_duration = c.freeze_time ? Math.max(0, Math.round((new Date(c.freeze_time).getTime() - start_ms) / 60000)) : 0;
+        const unfreeze_duration = c.unfreeze_time ? Math.max(0, Math.round((new Date(c.unfreeze_time).getTime() - end_ms) / 60000)) : 0;
+
         setForm({
           name: c.name,
           description: c.description || '',
@@ -57,8 +66,13 @@ export default function EditContestPage() {
           duration_seconds: c.duration_seconds || 0,
           start_time: formatForInput(c.start_time),
           end_time: formatForInput(c.end_time),
-          freeze_time: formatForInput(c.freeze_time),
+          freeze_duration,
+          unfreeze_duration,
         });
+
+        if (c.freeze_time || c.unfreeze_time) {
+          setEnableFreeze(true);
+        }
         
         setProblems(p.length > 0 ? p.map(prob => ({ title: prob.problem_title, id: null })) : [{ title: '', id: null }]);
       } catch (err) {
@@ -121,9 +135,12 @@ export default function EditContestPage() {
         description: form.description,
         visibility: form.visibility,
         start_time: form.start_time ? new Date(form.start_time).toISOString() : null,
-        freeze_time: form.freeze_time ? new Date(form.freeze_time).toISOString() : null,
+        freeze_time: enableFreeze && form.freeze_duration >= 0 && form.start_time ? new Date(new Date(form.start_time).getTime() + form.freeze_duration * 60000).toISOString() : null,
         problems: validProblems,
       };
+
+      const end_ms = form.end_time ? new Date(form.end_time).getTime() : new Date(form.start_time).getTime() + (form.duration_seconds || 0) * 1000;
+      payload.unfreeze_time = enableFreeze && form.unfreeze_duration >= 0 ? new Date(end_ms + form.unfreeze_duration * 60000).toISOString() : null;
 
       if (contest.type === 'global') {
         payload.end_time = form.end_time ? new Date(form.end_time).toISOString() : null;
@@ -273,17 +290,45 @@ export default function EditContestPage() {
                 />
               </div>
             )}
-            
-            <div>
-              <label className="neon-label">Freeze Time (Optional)</label>
-              <input
-                type="datetime-local"
-                className="neon-input"
-                value={form.freeze_time}
-                onChange={(e) => setForm({ ...form, freeze_time: e.target.value })}
+          </div>
+
+          <div className="neon-card p-4 bg-white/[0.01]">
+            <label className="flex items-center gap-2 text-sm text-foreground mb-4 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={enableFreeze} 
+                onChange={(e) => setEnableFreeze(e.target.checked)} 
+                className="w-4 h-4 text-primary bg-transparent border border-white/20 rounded accent-primary" 
               />
-              <p className="text-[10px] text-muted mt-1">Hide submissions from leaderboard after this time.</p>
-            </div>
+              <span className="font-semibold text-lg">Enable Scoreboard Freeze</span>
+            </label>
+
+            {enableFreeze && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-l-2 border-primary/30 pl-4 py-2">
+                <div>
+                  <label className="neon-label">Freeze Start (Mins after Contest Start)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="neon-input"
+                    value={form.freeze_duration === 0 ? '0' : form.freeze_duration || ''}
+                    onChange={(e) => setForm({ ...form, freeze_duration: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                  />
+                  <p className="text-[10px] text-muted mt-1">Hide submissions from leaderboard after this time.</p>
+                </div>
+                
+                <div>
+                  <label className="neon-label">Unfreeze (Mins after Contest End)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="neon-input"
+                    value={form.unfreeze_duration === 0 ? '0' : form.unfreeze_duration || ''}
+                    onChange={(e) => setForm({ ...form, unfreeze_duration: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="neon-divider" />

@@ -140,7 +140,7 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                     let content = null;
 
                     if (status.status === 'accepted') {
-                      bgClass = status.isFirstBlood ? 'bg-green-900 border border-green-700 font-bold text-green-100 shadow-[inset_0_0_15px_rgba(0,255,0,0.15)]' : 'bg-green-500/15 text-green-400';
+                      bgClass = status.isFirstBlood ? 'bg-green-500/15 text-green-400' : 'bg-green-900 border border-green-700 font-bold text-green-100 shadow-[inset_0_0_15px_rgba(0,255,0,0.15)]';
                       content = (
                         <div className="leading-tight flex flex-col items-center justify-center">
                           {status.attempts > 1 && <span className="text-sm font-semibold">-{status.attempts - 1}</span>}
@@ -155,8 +155,8 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                       bgClass = 'bg-blue-500/30 text-blue-300 border border-blue-500/30';
                       content = (
                         <div className="leading-tight tooltip hover:cursor-help" title={`Frozen after ${status.attempts} attempts`}>
-                          <span className="text-sm">?</span>
-                          {status.attempts > 0 && <span className="text-[10px] block opacity-80">+{status.attempts}</span>}
+                          <span className="text-xl font-bold neon-glow-text" style={{ textShadow: '0 0 10px rgba(59,130,246,0.8)' }}>-</span>
+                          {status.attempts > 0 && <span className="text-[10px] block opacity-80 mt-1">+{status.attempts}</span>}
                         </div>
                       );
                     } else if (status.status === 'pending') {

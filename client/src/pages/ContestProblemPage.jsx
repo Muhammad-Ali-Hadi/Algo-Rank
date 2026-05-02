@@ -6,6 +6,7 @@ import NeonLayout from '../components/NeonLayout';
 import { api } from '../services/api';
 import DOMPurify from 'dompurify';
 import { formatProblemDescription, retypeset } from '../utils/formatProblem';
+import { generateProblemSlug } from '../utils/slugify';
 
 function getContestStatus(contest) {
   const now = new Date();
@@ -51,8 +52,8 @@ export default function ContestProblemPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await api.getContestById(id);
-        const targetProblem = data.problems.find(p => p.id === problemId);
+        const data = await api.getContestById(id, true);
+        const targetProblem = data.problems.find(p => p.id === problemId || generateProblemSlug(p.problem_title) === problemId);
         if (!targetProblem) {
           throw new Error('Problem not found in this contest');
         }
@@ -106,7 +107,7 @@ export default function ContestProblemPage() {
 
     try {
       const res = await api.submitSolution(id, {
-        problem_id: problemId,
+        problem_id: problem.id,
         language,
         code_text: code,
         solution_url: '',

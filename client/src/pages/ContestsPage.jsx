@@ -71,7 +71,7 @@ export default function ContestsPage() {
 
     try {
       await api.deleteContest(id);
-      setContests(contests.filter(c => c.id !== id));
+      setContests(contests.filter(c => c.id !== id && c.invite_code !== id));
     } catch (err) {
       alert(err.message || 'Failed to delete contest');
     }
@@ -178,7 +178,7 @@ export default function ContestsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05 * i }}
               >
-                <Link to={`/contests/${contest.id}`} className="block">
+                <Link to={`/contests/${contest.invite_code || contest.id}`} className="block">
                   <div className="neon-card p-6 cursor-pointer relative group">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-20">
                       <div className="flex-1 min-w-0">
@@ -213,14 +213,14 @@ export default function ContestsPage() {
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
                             className="p-1.5 rounded-md hover:bg-white/10 text-muted hover:text-primary transition-colors"
-                            onClick={(e) => handleEditClick(e, contest.id)}
+                            onClick={(e) => handleEditClick(e, contest.invite_code || contest.id)}
                             title="Edit Contest"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                           </button>
                           <button 
                             className="p-1.5 rounded-md hover:bg-red-500/20 text-muted hover:text-red-400 transition-colors"
-                            onClick={(e) => handleDeleteContest(e, contest.id)}
+                            onClick={(e) => handleDeleteContest(e, contest.invite_code || contest.id)}
                             title="Delete Contest"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>

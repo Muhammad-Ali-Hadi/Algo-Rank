@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import NeonLayout from '../components/NeonLayout';
 import LeaderboardSection from '../components/LeaderboardSection';
 import { api } from '../services/api';
+import { generateProblemSlug } from '../utils/slugify';
 
 function getContestStatus(contest, currentTime = new Date()) {
   const start = new Date(contest.start_time);
@@ -77,6 +78,18 @@ export default function ContestDetailPage() {
       fetchContest();
     }
   }, [now, contest]);
+
+  // Background polling to mirror creator live updates natively
+  useEffect(() => {
+    if (!id) return;
+    const interval = setInterval(() => {
+      api.getContestById(id).then(data => {
+        setContest(data.contest);
+        setParticipants(data.participants || []);
+      }).catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [id]);
 
   const fetchContest = async () => {
     try {
@@ -322,7 +335,12 @@ export default function ContestDetailPage() {
                 <span className="text-xs text-muted bg-white/5 px-2 py-1 rounded">{problems.length} total</span>
               </div>
 
-              {problems.length === 0 ? (
+              {status === 'upcoming' && !isCreatorOrAdmin ? (
+                <div className="text-center py-12 bg-white/[0.02] border border-dashed border-white/10 rounded-xl">
+                  <p className="text-muted text-lg mb-2">⏳ Contest has not started yet</p>
+                  <p className="text-muted text-sm">Problems will be revealed once the countdown finishes.</p>
+                </div>
+              ) : problems.length === 0 ? (
                 <div className="text-center py-12 bg-white/[0.02] border border-dashed border-white/10 rounded-xl">
                   <p className="text-muted text-sm">No problems added to this contest yet.</p>
                 </div>
@@ -331,7 +349,7 @@ export default function ContestDetailPage() {
                   {problems.map((problem, i) => (
                     <Link 
                       key={problem.id}
-                      to={`/contests/${id}/problem/${problem.id}`}
+                      to={`/contests/${id}/problem/${generateProblemSlug(problem.problem_title)}`}
                       className="flex flex-col sm:flex-row sm:items-center gap-4 p-5 rounded-xl bg-gradient-to-r from-white/[0.03] to-transparent border border-white/[0.08] hover:border-primary/50 hover:bg-white/[0.05] transition-all group"
                     >
                       <div className="flex items-center gap-4 flex-1">
