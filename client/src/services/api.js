@@ -125,6 +125,10 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ description }),
     }),
+  disqualifyParticipant: (contestId, userId) =>
+    fetchWithAuth(`/contests/${contestId}/disqualify/${userId}`, { method: 'POST' }),
+  getSubmissionCode: (contestId, subId) =>
+    fetchWithAuth(`/contests/${contestId}/submissions/${subId}/code`),
 
   // Profile APIs
   updateProfileData: (data) =>

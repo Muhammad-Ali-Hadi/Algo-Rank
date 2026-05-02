@@ -20,6 +20,8 @@ const {
   getLeaderboard,
   forkProblem,
   updateForkDescription,
+  disqualifyParticipant,
+  getSubmissionCode,
 } = require('../controllers/contestController');
 
 // All contest routes require authentication
@@ -67,6 +69,12 @@ router.post('/:id/submit', heavyThrottler, submissionLimiter, submitSolution);
 
 // Get leaderboard
 router.get('/:id/leaderboard', getLeaderboard);
+
+// Disqualify participant
+router.post('/:id/disqualify/:userId', disqualifyParticipant);
+
+// Get submission code and details
+router.get('/:id/submissions/:subId/code', getSubmissionCode);
 
 module.exports = router;
 
