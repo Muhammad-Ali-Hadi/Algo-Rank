@@ -51,7 +51,7 @@ export default function ProfilePage() {
     if (!file) return;
 
     if (file.size > 1_000_000) {
-      setMsg({ text: 'Image is too large (max 1MB).', type: 'error' });
+      setError('Image is too large (max 1MB).');
       return;
     }
 

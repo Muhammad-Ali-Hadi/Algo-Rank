@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config(); // Reloaded config to fix email issues
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -22,7 +22,8 @@ app.use(cors({
   credentials: true,
 }));
 app.use(morgan('dev'));
-app.use(express.json({ limit: '2mb' })); // Increased for avatar base64
+app.use(express.json({ limit: '5mb' })); // Increased to 5MB to comfortably handle 1MB+ base64 avatars
+
 
 // Global rate limiter & Concurrency Queue
 app.use(generalLimiter);

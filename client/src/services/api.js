@@ -145,6 +145,7 @@ export const api = {
     fetchWithAuth('/profile/avatar', {
       method: 'DELETE',
     }),
+  getContestHistory: () => fetchWithAuth('/profile/contest-history'),
 
   // Problem APIs
   getProblems: (page = 1, limit = 20) => fetchWithAuth(`/problems?page=${page}&limit=${limit}`),
