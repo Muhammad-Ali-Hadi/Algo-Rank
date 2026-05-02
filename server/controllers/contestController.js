@@ -713,7 +713,7 @@ const getLeaderboard = async (req, res) => {
       const [contestRes, submissionsRes, participantsRes] = await Promise.all([
         supabaseAdmin.from('contests').select('*').eq('id', id).single(),
         supabaseAdmin.from('submissions').select('*, contest_problems(order_index, problem_title)').eq('contest_id', id).order('submitted_at', { ascending: true }),
-        supabaseAdmin.from('contest_participants').select('user_id').eq('contest_id', id)
+        supabaseAdmin.from('contest_participants').select('user_id, is_disqualified').eq('contest_id', id)
       ]);
 
       const contest = contestRes.data;
@@ -743,6 +743,7 @@ const getLeaderboard = async (req, res) => {
       for (const p of participants) {
         userStats[p.user_id] = {
           user_id: p.user_id,
+          is_disqualified: p.is_disqualified || false,
           user: (users || []).find(u => u.id === p.user_id) || null,
           solved: 0,
           penalty: 0,
@@ -771,9 +772,10 @@ const getLeaderboard = async (req, res) => {
         // If frozen, hide submissions after freeze time
         if (isFrozen && new Date(sub.submitted_at) >= freezeTime) {
           if (!userStats[uid].problems[problemKey]) {
-            userStats[uid].problems[problemKey] = { status: 'frozen', attempts: 0 };
+            userStats[uid].problems[problemKey] = { status: 'frozen', attempts: 0, submission_id: sub.id };
           } else if (userStats[uid].problems[problemKey].status !== 'accepted') {
             userStats[uid].problems[problemKey].status = 'frozen';
+            userStats[uid].problems[problemKey].submission_id = sub.id;
           }
           continue;
         }
@@ -805,17 +807,28 @@ const getLeaderboard = async (req, res) => {
           if (firstBloods[problemKey] === uid) {
             prob.isFirstBlood = true;
           }
+          prob.submission_id = sub.id;
         } else {
           prob.status = sub.status;
+          prob.submission_id = sub.id;
         }
       }
 
-      // Filter out participants who haven't made any submissions
-      let leaderboard = Object.values(userStats).filter(u => Object.keys(u.problems).length > 0);
+      // Filter out participants who haven't made any submissions (unless disqualified, we want to show them)
+      let leaderboard = Object.values(userStats).filter(u => Object.keys(u.problems).length > 0 || u.is_disqualified);
 
-      // Sort by solved (desc), then penalty (asc)
-      leaderboard = leaderboard.sort((a, b) => b.solved - a.solved || a.penalty - b.penalty)
-        .map((entry, rank) => ({ ...entry, rank: rank + 1 }));
+      // Separate disqualified and normal users
+      const normalUsers = leaderboard.filter(u => !u.is_disqualified);
+      const disqualifiedUsers = leaderboard.filter(u => u.is_disqualified);
+
+      // Sort normal users by solved (desc), then penalty (asc)
+      const sortedNormal = normalUsers.sort((a, b) => b.solved - a.solved || a.penalty - b.penalty)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
+
+      // Disqualified users get rank '-'
+      const sortedDisqualified = disqualifiedUsers.map(entry => ({ ...entry, rank: '-' }));
+
+      leaderboard = [...sortedNormal, ...sortedDisqualified];
 
       return { leaderboard, frozen: isFrozen };
     });
@@ -1087,6 +1100,67 @@ const updateForkDescription = async (req, res) => {
   }
 };
 
+// ==================== DISQUALIFY PARTICIPANT ====================
+const disqualifyParticipant = async (req, res) => {
+  const { id: rawId, userId } = req.params;
+  try {
+    const id = await resolveContestId(rawId);
+    
+    // Authorize owner
+    const { data: contest } = await supabaseAdmin.from('contests').select('creator_id').eq('id', id).single();
+    if (!contest || (contest.creator_id !== req.user.id && !req.user.isAdmin)) {
+      return res.status(403).json({ error: 'Only contest owner or admin can disqualify' });
+    }
+
+    // Get current disqualify status to toggle
+    const { data: participant } = await supabaseAdmin.from('contest_participants').select('is_disqualified').eq('contest_id', id).eq('user_id', userId).single();
+    if (!participant) {
+      return res.status(404).json({ error: 'Participant not found' });
+    }
+
+    const { error } = await supabaseAdmin.from('contest_participants').update({ is_disqualified: !participant.is_disqualified }).eq('contest_id', id).eq('user_id', userId);
+    
+    if (error) throw error;
+    
+    invalidate(KEYS.leaderboard(id));
+    return res.status(200).json({ message: 'Disqualification status updated' });
+  } catch (err) {
+    console.error('Disqualify exception:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ==================== GET SUBMISSION CODE ====================
+const getSubmissionCode = async (req, res) => {
+  const { id: rawId, subId } = req.params;
+  try {
+    const id = await resolveContestId(rawId);
+
+    const { data: contest } = await supabaseAdmin.from('contests').select('creator_id, end_time').eq('id', id).single();
+    if (!contest) return res.status(404).json({ error: 'Contest not found' });
+
+    const { data: submission } = await supabaseAdmin.from('submissions')
+      .select('*, contest_problems(problem_title), users!submissions_user_id_fkey(name, username, avatar_url)')
+      .eq('id', subId)
+      .single();
+      
+    if (!submission) return res.status(404).json({ error: 'Submission not found' });
+
+    const isOwner = contest.creator_id === req.user.id || req.user.isAdmin;
+    const isEnded = new Date(contest.end_time) < new Date();
+    const isSelf = submission.user_id === req.user.id;
+
+    if (!isOwner && !isEnded && !isSelf) {
+      return res.status(403).json({ error: 'You do not have permission to view this submission. Codes are open-sourced to everyone after the contest ends.' });
+    }
+
+    return res.status(200).json(submission);
+  } catch (err) {
+    console.error('Get submission code exception:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   createGlobalContest,
   createLocalContest,
@@ -1103,4 +1177,6 @@ module.exports = {
   getLeaderboard,
   forkProblem,
   updateForkDescription,
+  disqualifyParticipant,
+  getSubmissionCode,
 };
