@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
 
 const VERDICT_STYLES = {
-  pending:       { bg: 'bg-yellow-500/10 border-yellow-500/30', text: 'text-yellow-400', label: '⏳ Judging...' },
-  accepted:      { bg: 'bg-green-500/10 border-green-500/30',  text: 'text-green-400',  label: '✅ Accepted' },
-  wrong_answer:  { bg: 'bg-red-500/10 border-red-500/30',      text: 'text-red-400',    label: '❌ Wrong Answer' },
-  compile_error: { bg: 'bg-orange-500/10 border-orange-500/30', text: 'text-orange-400', label: '⚠️ Compilation Error' },
-  runtime_error: { bg: 'bg-red-500/10 border-red-500/30',      text: 'text-red-400',    label: '💥 Runtime Error' },
-  time_limit:    { bg: 'bg-purple-500/10 border-purple-500/30', text: 'text-purple-400', label: '⏱️ Time Limit Exceeded' },
-  frozen:        { bg: 'bg-blue-500/10 border-blue-500/30',    text: 'text-blue-400',   label: '❄️ Frozen' },
+  pending:       { bg: 'bg-yellow-500/10 border-yellow-500/30', text: 'text-yellow-400', label: 'Judging...' },
+  accepted:      { bg: 'bg-green-500/10 border-green-500/30',  text: 'text-green-400',  label: 'Accepted' },
+  wrong_answer:  { bg: 'bg-red-500/10 border-red-500/30',      text: 'text-red-400',    label: 'Wrong Answer' },
+  compile_error: { bg: 'bg-orange-500/10 border-orange-500/30', text: 'text-orange-400', label: 'Compilation Error' },
+  runtime_error: { bg: 'bg-red-500/10 border-red-500/30',      text: 'text-red-400',    label: 'Runtime Error' },
+  time_limit:    { bg: 'bg-purple-500/10 border-purple-500/30', text: 'text-purple-400', label: 'Time Limit Exceeded' },
+  frozen:        { bg: 'bg-blue-500/10 border-blue-500/30',    text: 'text-blue-400',   label: 'Frozen' },
 };
 
 export default function ViewSubmissionModal({ isOpen, onClose, contestId, submissionId }) {
@@ -39,9 +40,9 @@ export default function ViewSubmissionModal({ isOpen, onClose, contestId, submis
 
   const verdictStyle = submission ? (VERDICT_STYLES[submission.status] || VERDICT_STYLES.pending) : null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
         <motion.div
           className="absolute inset-0 bg-black/70 backdrop-blur-sm"
           initial={{ opacity: 0 }}
@@ -141,6 +142,7 @@ export default function ViewSubmissionModal({ isOpen, onClose, contestId, submis
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
