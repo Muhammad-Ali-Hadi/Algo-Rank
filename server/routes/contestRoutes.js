@@ -17,6 +17,8 @@ const {
   submitSolution,
   getSubmissionStatus,
   getLeaderboard,
+  forkProblem,
+  updateForkDescription,
 } = require('../controllers/contestController');
 
 // All contest routes require authentication
@@ -37,6 +39,16 @@ router.post('/scrape-problem', scrapeProblemHandler);
 // Join a contest by invite code
 router.post('/join-invite', joinByInviteCode);
 
+// Compile code (Syntax Check)
+router.post('/compile', compileSolution);
+
+// Get submission status
+router.get('/submissions/:subId', getSubmissionStatus);
+
+// Fork routes (must be before /:id catch-all)
+router.post('/:id/fork/:problemId', forkProblem);
+router.put('/fork/:forkId/description', updateForkDescription);
+
 // Get a specific contest by ID
 router.get('/:id', getContestById);
 
@@ -49,16 +61,11 @@ router.delete('/:id', deleteContest);
 // Join a contest
 router.post('/:id/join', joinContest);
 
-// Compile code (Syntax Check)
-router.post('/compile', compileSolution);
-
 // Submit a solution (rate limited)
 router.post('/:id/submit', submissionLimiter, submitSolution);
-
-// Get submission status
-router.get('/submissions/:subId', getSubmissionStatus);
 
 // Get leaderboard
 router.get('/:id/leaderboard', getLeaderboard);
 
 module.exports = router;
+

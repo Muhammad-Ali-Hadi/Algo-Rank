@@ -845,6 +845,248 @@ const compileSolution = async (req, res) => {
   }
 };
 
+// ==================== FORK PROBLEM ====================
+const forkProblem = async (req, res) => {
+  try {
+    const { id: rawId, problemId } = req.params;
+    const id = await resolveContestId(rawId);
+
+    // 1. Validate contest exists and is upcoming
+    const { data: contest, error: contestErr } = await supabaseAdmin
+      .from('contests')
+      .select('id, start_time')
+      .eq('id', id)
+      .single();
+
+    if (contestErr || !contest) {
+      return res.status(404).json({ error: 'Contest not found' });
+    }
+
+    const now = new Date();
+    if (now >= new Date(contest.start_time)) {
+      return res.status(400).json({ error: 'Cannot fork problems after the contest has started. Forking is only available during the scheduling phase.' });
+    }
+
+    // 2. Validate the contest_problem exists in this contest
+    const { data: contestProblem, error: cpErr } = await supabaseAdmin
+      .from('contest_problems')
+      .select('*')
+      .eq('id', problemId)
+      .eq('contest_id', id)
+      .single();
+
+    if (cpErr || !contestProblem) {
+      return res.status(404).json({ error: 'Problem not found in this contest' });
+    }
+
+    // 3. Check for duplicate fork (same user, same contest_problem)
+    const { data: existingFork } = await supabaseAdmin
+      .from('problems')
+      .select('id, title, description')
+      .eq('creator_id', req.user.id)
+      .eq('forked_from_contest_problem', problemId)
+      .single();
+
+    if (existingFork) {
+      return res.status(200).json({
+        message: 'Existing fork found',
+        fork: existingFork,
+      });
+    }
+
+    // 4. Try to find metadata from the original problem bank (matched by title)
+    const { data: originalProblem } = await supabaseAdmin
+      .from('problems')
+      .select('id, difficulty, time_limit, memory_limit')
+      .eq('title', contestProblem.problem_title)
+      .is('forked_from_contest_problem', null)
+      .single();
+
+    // 5. Create the forked problem in the problems table
+    const { data: forkedProblem, error: insertErr } = await supabaseAdmin
+      .from('problems')
+      .insert({
+        title: contestProblem.problem_title,
+        description: contestProblem.scraped_content || '',
+        difficulty: originalProblem?.difficulty || null,
+        time_limit: originalProblem?.time_limit || 1000,
+        memory_limit: originalProblem?.memory_limit || 256,
+        creator_id: req.user.id,
+        forked_from_contest_problem: contestProblem.id,
+      })
+      .select()
+      .single();
+
+    if (insertErr) {
+      // Handle unique constraint violation gracefully by returning existing
+      if (insertErr.code === '23505') {
+        const { data: reFetch } = await supabaseAdmin
+          .from('problems')
+          .select('*')
+          .eq('creator_id', req.user.id)
+          .eq('forked_from_contest_problem', problemId)
+          .single();
+        return res.status(200).json({ message: 'Existing fork retrieved', fork: reFetch });
+      }
+      console.error('Fork problem insert error details:', {
+        code: insertErr.code,
+        message: insertErr.message,
+        details: insertErr.details,
+        hint: insertErr.hint
+      });
+      
+      if (insertErr.code === '42703') { // Undefined column
+        return res.status(500).json({ error: 'Database schema mismatch. Please ensure you have run the migration in fork_migration.sql to add creator_id and forked_from_contest_problem columns.' });
+      }
+      
+      return res.status(500).json({ error: `Failed to create forked problem: ${insertErr.message}` });
+    }
+
+    // 6. Copy sample test cases from scraped_samples JSON → test_cases rows
+    const testCaseRows = [];
+
+    if (contestProblem.scraped_samples && Array.isArray(contestProblem.scraped_samples)) {
+      contestProblem.scraped_samples.forEach((sample, idx) => {
+        testCaseRows.push({
+          problem_id: forkedProblem.id,
+          input: sample.input || '',
+          expected_output: sample.output || '',
+          is_hidden: false,
+          order_index: idx,
+        });
+      });
+    }
+
+    // 7. Copy hidden test cases if original problem was found
+    if (originalProblem) {
+      const { data: hiddenTCs } = await supabaseAdmin
+        .from('test_cases')
+        .select('*')
+        .eq('problem_id', originalProblem.id)
+        .eq('is_hidden', true)
+        .order('order_index', { ascending: true });
+
+      if (hiddenTCs && hiddenTCs.length > 0) {
+        const startIdx = testCaseRows.length;
+        hiddenTCs.forEach((tc, idx) => {
+          testCaseRows.push({
+            problem_id: forkedProblem.id,
+            input: tc.input,
+            expected_output: tc.expected_output,
+            is_hidden: true,
+            order_index: startIdx + idx,
+          });
+        });
+      }
+    }
+
+    // Insert all test cases at once
+    if (testCaseRows.length > 0) {
+      const { error: tcErr } = await supabaseAdmin
+        .from('test_cases')
+        .insert(testCaseRows);
+
+      if (tcErr) {
+        console.error('Fork test cases insert error:', tcErr);
+        // Don't fail the whole operation — problem was created, test cases can be retried
+      }
+    }
+
+    return res.status(201).json({
+      message: 'Problem forked successfully',
+      fork: forkedProblem,
+      testCasesCopied: testCaseRows.length,
+    });
+  } catch (err) {
+    console.error('Fork problem exception:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ==================== UPDATE FORK DESCRIPTION ====================
+const updateForkDescription = async (req, res) => {
+  try {
+    const { forkId } = req.params;
+    const { description } = req.body;
+
+    if (description === undefined || description === null) {
+      return res.status(400).json({ error: 'Description is required' });
+    }
+
+    // 1. Fetch the fork and validate it IS a fork
+    const { data: fork, error: fetchErr } = await supabaseAdmin
+      .from('problems')
+      .select('id, creator_id, forked_from_contest_problem')
+      .eq('id', forkId)
+      .single();
+
+    if (fetchErr || !fork) {
+      return res.status(404).json({ error: 'Forked problem not found' });
+    }
+
+    if (!fork.forked_from_contest_problem) {
+      return res.status(400).json({ error: 'This problem is not a fork. Only forked problems can be edited this way.' });
+    }
+
+    // 2. Validate ownership of the fork
+    if (fork.creator_id !== req.user.id) {
+      return res.status(403).json({ error: 'You can only edit forks that you created' });
+    }
+
+    // 3. Update ONLY the description in the problems table
+    const { data: updated, error: updateErr } = await supabaseAdmin
+      .from('problems')
+      .update({ description })
+      .eq('id', forkId)
+      .select()
+      .single();
+
+    if (updateErr) {
+      console.error('Update fork description error:', updateErr);
+      return res.status(500).json({ error: 'Failed to update fork description' });
+    }
+
+    // 4. SYNC TO CONTEST: If the user is the creator of the contest associated with this fork,
+    // update the scraped_content in contest_problems so it's visible to participants.
+    try {
+      const { data: contestProblem } = await supabaseAdmin
+        .from('contest_problems')
+        .select('id, contest_id')
+        .eq('id', fork.forked_from_contest_problem)
+        .single();
+
+      if (contestProblem) {
+        const { data: contest } = await supabaseAdmin
+          .from('contests')
+          .select('id, creator_id')
+          .eq('id', contestProblem.contest_id)
+          .single();
+
+        if (contest && (contest.creator_id === req.user.id || req.user.isAdmin)) {
+          // Sync the description to the contest
+          await supabaseAdmin
+            .from('contest_problems')
+            .update({ scraped_content: description })
+            .eq('id', contestProblem.id);
+          
+          console.log(`Synced fork ${forkId} to contest problem ${contestProblem.id}`);
+        }
+      }
+    } catch (syncErr) {
+      console.error('Failed to sync fork description to contest:', syncErr);
+      // Don't fail the primary request
+    }
+
+    return res.status(200).json({
+      message: 'Fork description updated',
+      fork: updated,
+    });
+  } catch (err) {
+    console.error('Update fork description exception:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   createGlobalContest,
   createLocalContest,
@@ -859,4 +1101,6 @@ module.exports = {
   submitSolution,
   getSubmissionStatus,
   getLeaderboard,
+  forkProblem,
+  updateForkDescription,
 };
