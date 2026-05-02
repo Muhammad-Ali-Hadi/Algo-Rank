@@ -52,6 +52,9 @@ router.get('/submissions/:subId', getSubmissionStatus);
 router.post('/:id/fork/:problemId', heavyThrottler, forkProblem);
 router.put('/fork/:forkId/description', updateForkDescription);
 
+// Get submission code and details (must be before /:id catch-all)
+router.get('/:id/submissions/:subId/code', getSubmissionCode);
+
 // Get a specific contest by ID
 router.get('/:id', getContestById);
 
@@ -72,9 +75,6 @@ router.get('/:id/leaderboard', getLeaderboard);
 
 // Disqualify participant
 router.post('/:id/disqualify/:userId', disqualifyParticipant);
-
-// Get submission code and details
-router.get('/:id/submissions/:subId/code', getSubmissionCode);
 
 module.exports = router;
 

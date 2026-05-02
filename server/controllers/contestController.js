@@ -1145,16 +1145,30 @@ const getSubmissionCode = async (req, res) => {
     const { data: contest } = await supabaseAdmin.from('contests').select('creator_id, end_time').eq('id', id).single();
     if (!contest) return res.status(404).json({ error: 'Contest not found' });
 
-    const { data: submission } = await supabaseAdmin.from('submissions')
-      .select('*, contest_problems(problem_title), users!submissions_user_id_fkey(name, username, avatar_url)')
+    // Fetch submission + related contest problem info
+    const { data: submission, error: subError } = await supabaseAdmin.from('submissions')
+      .select('*, contest_problems(problem_title)')
       .eq('id', subId)
       .single();
-      
-    if (!submission) return res.status(404).json({ error: 'Submission not found' });
 
-    const isOwner = contest.creator_id === req.user.id || req.user.isAdmin;
+    if (subError || !submission) {
+      console.error('[getSubmissionCode] Submission fetch error:', subError);
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    // Separately fetch user info
+    const { data: user } = await supabaseAdmin.from('users')
+      .select('name, username, avatar_url')
+      .eq('id', submission.user_id)
+      .single();
+
+    submission.users = user || null;
+
+    const isOwner = String(contest.creator_id) === String(req.user.id) || req.user.isAdmin;
     const isEnded = new Date(contest.end_time) < new Date();
-    const isSelf = submission.user_id === req.user.id;
+    const isSelf = String(submission.user_id) === String(req.user.id);
+
+    console.log(`[getSubmissionCode] isOwner=${isOwner}, isEnded=${isEnded}, isSelf=${isSelf}, creator_id=${contest.creator_id}, user.id=${req.user.id}`);
 
     if (!isOwner && !isEnded && !isSelf) {
       return res.status(403).json({ error: 'You do not have permission to view this submission. Codes are open-sourced to everyone after the contest ends.' });
@@ -1166,6 +1180,7 @@ const getSubmissionCode = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 
 module.exports = {
   createGlobalContest,
