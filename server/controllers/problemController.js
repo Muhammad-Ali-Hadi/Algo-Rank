@@ -18,6 +18,7 @@ const getProblems = async (req, res) => {
       const { data: problems, error, count } = await supabaseAdmin
         .from('problems')
         .select('id, title, difficulty, time_limit, memory_limit, created_at', { count: 'exact' })
+        .is('forked_from_contest_problem', null)
         .order('created_at', { ascending: true })
         .range(from, to);
 

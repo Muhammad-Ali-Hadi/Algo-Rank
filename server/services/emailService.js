@@ -7,9 +7,11 @@ const nodemailer = require('nodemailer');
 
 // Initialize the email transporter with Gmail
 const transporter = nodemailer.createTransport({
+  service: process.env.EMAIL_SERVICE || 'gmail',
   host: 'smtp.gmail.com',
   port: 465,
   secure: true,
+  family: 4, // Force IPv4 to avoid IPv6 ENETUNREACH timeout issues
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
