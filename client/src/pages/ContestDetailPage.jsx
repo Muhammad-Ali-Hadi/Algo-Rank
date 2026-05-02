@@ -514,6 +514,8 @@ export default function ContestDetailPage() {
                 isCreator={isCreatorOrAdmin} 
                 isParticipant={isParticipant}
                 problemsCount={problems.length}
+                contestEnded={status === 'ended'}
+                currentUserId={profile?.id}
               />
             </motion.div>
           )}

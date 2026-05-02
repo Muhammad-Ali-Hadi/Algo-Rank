@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { api } from '../services/api';
 import ViewSubmissionModal from './ViewSubmissionModal';
 
-export default function LeaderboardSection({ contestId, problemsCount, isParticipant, isCreator }) {
+export default function LeaderboardSection({ contestId, problemsCount, isParticipant, isCreator, contestEnded, currentUserId }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [frozen, setFrozen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -19,8 +19,17 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
     }
   };
 
-  const handleCellClick = (submissionId) => {
+  // Determine whether a given row's submission is viewable by the current user
+  const canViewSubmission = (rowUserId) => {
+    if (isCreator) return true;        // Owner can always view
+    if (contestEnded) return true;     // Post-contest: open-source to all
+    if (String(rowUserId) === String(currentUserId)) return true; // Own submission
+    return false;
+  };
+
+  const handleCellClick = (submissionId, rowUserId) => {
     if (!submissionId) return;
+    if (!canViewSubmission(rowUserId)) return;
     setSelectedSubmission(submissionId);
   };
 
@@ -161,6 +170,7 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                       return <td key={i} className="px-4 py-3 text-center border-l border-white/5"><span className="text-muted/30">-</span></td>;
                     }
 
+                    const viewable = canViewSubmission(row.user_id);
                     let bgClass = '';
                     let content = null;
 
@@ -195,8 +205,9 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                     return (
                       <td 
                         key={i} 
-                        onClick={() => status.submission_id && handleCellClick(status.submission_id)}
-                        className={`px-2 py-1 text-center border-l border-white/5 align-middle ${status.submission_id ? 'cursor-pointer hover:bg-white/10 transition-colors' : ''} ${bgClass}`}
+                        onClick={() => status.submission_id && handleCellClick(status.submission_id, row.user_id)}
+                        className={`px-2 py-1 text-center border-l border-white/5 align-middle ${viewable && status.submission_id ? 'cursor-pointer hover:bg-white/10 transition-colors' : 'cursor-default'} ${bgClass}`}
+                        title={viewable ? 'Click to view submission' : (contestEnded ? '' : 'Available after the contest ends')}
                       >
                         {content}
                       </td>

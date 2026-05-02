@@ -128,7 +128,7 @@ export const api = {
   disqualifyParticipant: (contestId, userId) =>
     fetchWithAuth(`/contests/${contestId}/disqualify/${userId}`, { method: 'POST' }),
   getSubmissionCode: (contestId, subId) =>
-    fetchWithAuth(`/contests/${contestId}/submissions/${subId}/code`),
+    fetchWithAuth(`/contests/${contestId}/submissions/${subId}/code`, { method: 'POST' }),
 
   // Profile APIs
   updateProfileData: (data) =>

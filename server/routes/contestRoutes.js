@@ -52,8 +52,8 @@ router.get('/submissions/:subId', getSubmissionStatus);
 router.post('/:id/fork/:problemId', heavyThrottler, forkProblem);
 router.put('/fork/:forkId/description', updateForkDescription);
 
-// Get submission code and details (must be before /:id catch-all)
-router.get('/:id/submissions/:subId/code', getSubmissionCode);
+// Get submission code and details (POST to bypass client GET cache; must be before /:id catch-all)
+router.post('/:id/submissions/:subId/code', getSubmissionCode);
 
 // Get a specific contest by ID
 router.get('/:id', getContestById);
