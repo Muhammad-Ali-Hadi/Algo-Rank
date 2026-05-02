@@ -93,10 +93,13 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const updateUser = (newUserProps) => {
+  const updateUser = (newUserProps, newToken) => {
     const updatedUser = { ...user, ...newUserProps };
     setUser(updatedUser);
     localStorage.setItem('user', JSON.stringify(updatedUser));
+    if (newToken) {
+      localStorage.setItem('token', newToken);
+    }
   };
 
   return (

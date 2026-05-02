@@ -11,6 +11,7 @@ import ContestProblemPage from './pages/ContestProblemPage';
 import ProblemSetPage from './pages/ProblemSetPage';
 import ProblemDetailPage from './pages/ProblemDetailPage';
 import ContestHistoryPage from './pages/ContestHistoryPage';
+import VerificationPage from './pages/VerificationPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -46,6 +47,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/verify-email"
+        element={
+          <ProtectedRoute>
+            <VerificationPage />
           </ProtectedRoute>
         }
       />

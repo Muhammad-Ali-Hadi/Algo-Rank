@@ -27,6 +27,7 @@ create table public.users (
   password text not null,
   name text,
   avatar_url text default '',
+  is_verified boolean default false,
   created_at timestamp with time zone default now()
 );
 

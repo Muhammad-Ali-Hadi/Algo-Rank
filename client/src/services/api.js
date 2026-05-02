@@ -146,6 +146,16 @@ export const api = {
       method: 'DELETE',
     }),
   getContestHistory: () => fetchWithAuth('/profile/contest-history'),
+  verifyEmail: (otp, email) =>
+    fetchWithAuth('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ otp, email }),
+    }),
+  resendVerification: (email) =>
+    fetchWithAuth('/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
 
   // Problem APIs
   getProblems: (page = 1, limit = 20) => fetchWithAuth(`/problems?page=${page}&limit=${limit}`),

@@ -33,21 +33,22 @@ transporter.verify((err) => {
  * Send an OTP email to the user.
  * @param {string} to - recipient email address
  * @param {string} otp - the 6-digit OTP code
+ * @param {string} type - 'Password Reset' or 'Email Verification'
  */
-async function sendOTPEmail(to, otp) {
+async function sendOTPEmail(to, otp, type = 'Password Reset') {
   const mailOptions = {
     from: `"AlgoRank" <${process.env.EMAIL_USER || 'noreply@algorank.dev'}>`,
     to,
-    subject: 'AlgoRank — Password Reset OTP',
+    subject: `AlgoRank — ${type} OTP`,
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 16px; padding: 40px; color: #e5e7eb;">
         <h2 style="text-align: center; color: #58A6FF; margin-bottom: 8px;">AlgoRank</h2>
-        <p style="text-align: center; color: #6B7280; font-size: 14px; margin-bottom: 32px;">Password Reset Request</p>
-        <p style="font-size: 14px; line-height: 1.6;">You requested a password reset. Use the OTP below to verify your identity:</p>
+        <p style="text-align: center; color: #6B7280; font-size: 14px; margin-bottom: 32px;">${type}</p>
+        <p style="font-size: 14px; line-height: 1.6;">Use the OTP below to verify your identity for ${type.toLowerCase()}:</p>
         <div style="text-align: center; margin: 28px 0;">
           <span style="display: inline-block; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #ffffff; background: linear-gradient(135deg, #1F6FEB, #58A6FF); padding: 16px 32px; border-radius: 12px;">${otp}</span>
         </div>
-        <p style="font-size: 13px; color: #6B7280; text-align: center;">This code expires in <strong style="color: #e5e7eb;">5 minutes</strong>.</p>
+        <p style="font-size: 13px; color: #6B7280; text-align: center;">This code expires in <strong style="color: #e5e7eb;">10 minutes</strong>.</p>
         <p style="font-size: 12px; color: #4B5563; text-align: center; margin-top: 32px;">If you didn't request this, you can safely ignore this email.</p>
       </div>
     `,

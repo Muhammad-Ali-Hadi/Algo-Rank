@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
+const verificationMiddleware = require('../middleware/verificationMiddleware');
 const { submissionLimiter } = require('../middleware/rateLimiter');
 const { heavyThrottler } = require('../middleware/throttler');
 const {
@@ -28,10 +29,10 @@ const {
 router.use(authMiddleware);
 
 // Global contest creation (admin only)
-router.post('/global', adminMiddleware, createGlobalContest);
+router.post('/global', adminMiddleware, verificationMiddleware, createGlobalContest);
 
 // Local contest creation (any authenticated user)
-router.post('/local', createLocalContest);
+router.post('/local', verificationMiddleware, createLocalContest);
 
 // List all visible contests
 router.get('/', getContests);
@@ -40,7 +41,7 @@ router.get('/', getContests);
 router.post('/scrape-problem', heavyThrottler, scrapeProblemHandler);
 
 // Join a contest by invite code
-router.post('/join-invite', joinByInviteCode);
+router.post('/join-invite', verificationMiddleware, joinByInviteCode);
 
 // Compile code (Syntax Check)
 router.post('/compile', heavyThrottler, compileSolution);
@@ -65,10 +66,10 @@ router.put('/:id', updateContest);
 router.delete('/:id', deleteContest);
 
 // Join a contest
-router.post('/:id/join', joinContest);
+router.post('/:id/join', verificationMiddleware, joinContest);
 
 // Submit a solution (rate limited & queued)
-router.post('/:id/submit', heavyThrottler, submissionLimiter, submitSolution);
+router.post('/:id/submit', heavyThrottler, submissionLimiter, verificationMiddleware, submitSolution);
 
 // Get leaderboard
 router.get('/:id/leaderboard', getLeaderboard);

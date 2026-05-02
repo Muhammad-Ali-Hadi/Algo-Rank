@@ -223,12 +223,13 @@ async function checkSyntax(code, language) {
  *  4. Early-exit on first failure
  *  5. Update submission row with final verdict
  *
- * @param {string} submissionId  - UUID of the submission row
- * @param {string} problemTitle  - Title of the problem (to resolve problem_id in problems table)
- * @param {string} code          - Source code
- * @param {string} language      - Language name (e.g. "C++")
+ * @param {string} submissionId      - UUID of the submission row
+ * @param {string} contestProblemId - UUID of the contest_problems row
+ * @param {string} problemTitle      - Title of the problem
+ * @param {string} code              - Source code
+ * @param {string} language          - Language name (e.g. "C++")
  */
-async function evaluateSubmission(submissionId, problemTitle, code, language) {
+async function evaluateSubmission(submissionId, contestProblemId, problemTitle, code, language) {
   const languageId = LANGUAGE_MAP[language];
   if (!languageId) {
     await updateSubmissionStatus(submissionId, 'compile_error');
@@ -236,16 +237,28 @@ async function evaluateSubmission(submissionId, problemTitle, code, language) {
   }
 
   try {
-    // 1. Resolve the problem from the problems bank using title
-    const { data: problem } = await supabaseAdmin
+    // 1. Resolve the problem from the problems bank
+    // First, try to find a fork specifically for this contest problem
+    let { data: problem } = await supabaseAdmin
       .from('problems')
       .select('id, time_limit')
-      .eq('title', problemTitle)
+      .eq('forked_from_contest_problem', contestProblemId)
       .single();
 
+    // If no fork, fallback to searching by title in the global bank (where forked_from is null)
     if (!problem) {
-      console.warn(`[JudgeService] No problem found in bank for title: "${problemTitle}". Marking accepted (URL submission).`);
-      await updateSubmissionStatus(submissionId, 'accepted');
+      const { data: globalProb } = await supabaseAdmin
+        .from('problems')
+        .select('id, time_limit')
+        .eq('title', problemTitle)
+        .is('forked_from_contest_problem', null)
+        .single();
+      problem = globalProb;
+    }
+
+    if (!problem) {
+      console.warn(`[JudgeService] No problem found in bank for title: "${problemTitle}". Marking WA to prevent false AC.`);
+      await updateSubmissionStatus(submissionId, 'wrong_answer');
       return;
     }
 
@@ -253,8 +266,8 @@ async function evaluateSubmission(submissionId, problemTitle, code, language) {
     const testCases = await fetchAllTestCases(problem.id);
 
     if (testCases.length === 0) {
-      console.warn(`[JudgeService] No test cases for problem "${problemTitle}". Marking accepted.`);
-      await updateSubmissionStatus(submissionId, 'accepted');
+      console.warn(`[JudgeService] No test cases for problem "${problemTitle}". Marking WA.`);
+      await updateSubmissionStatus(submissionId, 'wrong_answer');
       return;
     }
 
