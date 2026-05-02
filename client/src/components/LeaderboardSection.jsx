@@ -1,12 +1,28 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../services/api';
+import ViewSubmissionModal from './ViewSubmissionModal';
 
-export default function LeaderboardSection({ contestId, problemsCount, isParticipant }) {
+export default function LeaderboardSection({ contestId, problemsCount, isParticipant, isCreator }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [frozen, setFrozen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+
+  const handleDisqualify = async (userId) => {
+    try {
+      await api.disqualifyParticipant(contestId, userId);
+      fetchLeaderboard();
+    } catch (err) {
+      alert(err.message || 'Failed to disqualify');
+    }
+  };
+
+  const handleCellClick = (submissionId) => {
+    if (!submissionId) return;
+    setSelectedSubmission(submissionId);
+  };
 
   const fetchLeaderboard = async () => {
     try {
@@ -110,7 +126,7 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
               </tr>
             ) : (
               leaderboard.map((row) => (
-                <tr key={row.user_id} className="hover:bg-white/[0.02] transition-colors">
+                <tr key={row.user_id} className={`hover:bg-white/[0.02] transition-colors ${row.is_disqualified ? 'opacity-50 grayscale' : ''}`}>
                   <td className="px-4 py-3 text-center font-mono">
                     {row.rank === 1 ? '🥇' : row.rank === 2 ? '🥈' : row.rank === 3 ? '🥉' : row.rank}
                   </td>
@@ -123,9 +139,18 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                       </div>
                     )}
                     <div className="flex flex-col">
-                      <span className="font-medium text-foreground text-sm">{row.user?.name || row.user?.username || 'Unknown User'}</span>
+                      <span className={`font-medium text-sm ${row.is_disqualified ? 'text-red-400 line-through' : 'text-foreground'}`}>{row.user?.name || row.user?.username || 'Unknown User'}</span>
                       {row.user?.username && <span className="text-[10px] text-muted -mt-0.5">@{row.user.username}</span>}
                     </div>
+                    {isCreator && (
+                      <button 
+                        onClick={() => handleDisqualify(row.user_id)}
+                        className={`ml-auto px-2 py-0.5 text-[10px] rounded border ${row.is_disqualified ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'} hover:opacity-80 transition-opacity`}
+                        title={row.is_disqualified ? "Restore Participant" : "Disqualify Participant"}
+                      >
+                        {row.is_disqualified ? 'Restore' : 'Disqualify'}
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center font-bold text-green-400">{row.solved}</td>
                   <td className="px-4 py-3 text-center font-mono text-muted">{row.penalty}</td>
@@ -168,7 +193,11 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
                     }
 
                     return (
-                      <td key={i} className={`px-2 py-1 text-center border-l border-white/5 align-middle ${bgClass}`}>
+                      <td 
+                        key={i} 
+                        onClick={() => status.submission_id && handleCellClick(status.submission_id)}
+                        className={`px-2 py-1 text-center border-l border-white/5 align-middle ${status.submission_id ? 'cursor-pointer hover:bg-white/10 transition-colors' : ''} ${bgClass}`}
+                      >
                         {content}
                       </td>
                     );
@@ -185,6 +214,13 @@ export default function LeaderboardSection({ contestId, problemsCount, isPartici
           <span>❄️</span> Scoreboard is frozen. Submissions made after the freeze time are hidden.
         </div>
       )}
+
+      <ViewSubmissionModal 
+        isOpen={!!selectedSubmission}
+        onClose={() => setSelectedSubmission(null)}
+        contestId={contestId}
+        submissionId={selectedSubmission}
+      />
     </motion.div>
   );
 }
