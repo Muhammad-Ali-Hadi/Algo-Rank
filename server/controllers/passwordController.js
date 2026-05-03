@@ -61,8 +61,10 @@ const forgotPassword = async (req, res) => {
 
     if (insertError) throw insertError;
 
-    // Send OTP email
-    await sendOTPEmail(email, otp, 'Password Reset');
+    // Fire and forget (async) — don't await so the user gets a fast response
+    sendOTPEmail(email, otp, 'Password Reset')
+      .then(() => console.log(`[Email] Background send success to ${email}`))
+      .catch(err => console.error(`[Email] Background send failed to ${email}:`, err.message));
 
     return res.status(200).json({
       message: 'OTP sent to your email. It expires in 10 minutes.',

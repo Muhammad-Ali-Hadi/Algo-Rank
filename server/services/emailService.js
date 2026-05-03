@@ -4,25 +4,49 @@
 // =============================================
 
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+const { promisify } = require('util');
+const lookup = promisify(dns.lookup);
 
 // Lazily create transporter so missing env vars don't crash the whole server at startup
 let _transporter = null;
 
-function getTransporter() {
+async function getTransporter() {
   if (_transporter) return _transporter;
 
+  let host = 'smtp.gmail.com';
+  
+  try {
+    // Force IPv4 resolution manually to bypass ENETUNREACH IPv6 issues on Render
+    const { address } = await lookup('smtp.gmail.com', { family: 4 });
+    host = address;
+    console.log(`[Email] Resolved smtp.gmail.com to IPv4: ${host}`);
+  } catch (dnsErr) {
+    console.warn('[Email] DNS lookup failed for smtp.gmail.com, falling back to hostname:', dnsErr.message);
+  }
+
   _transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    family: 4, // Force IPv4 — avoids IPv6 ENETUNREACH on some cloud hosts
+    host: host,
+    port: 587,
+    secure: false, // Use STARTTLS
+    requireTLS: true,
+    pool: true, 
+    maxConnections: 5,
+    maxMessages: 100,
+    connectionTimeout: 10000, 
+    greetingTimeout: 5000,
+    socketTimeout: 30000,
+    family: 4, 
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
     tls: {
-      rejectUnauthorized: false, // Needed on some cloud providers (e.g. Render)
+      rejectUnauthorized: false,
+      servername: 'smtp.gmail.com' // Crucial when using IP address as host
     },
+    debug: true, // Enable debug logging for better server-side troubleshooting
+    logger: true // Log events to the console
   });
 
   // Verify on first use
@@ -51,7 +75,7 @@ async function sendOTPEmail(to, otp, type = 'Password Reset') {
     throw new Error('EMAIL_USER and EMAIL_PASS environment variables are not set on the server.');
   }
 
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
 
   const mailOptions = {
     from: `"AlgoRank" <${process.env.EMAIL_USER}>`,
