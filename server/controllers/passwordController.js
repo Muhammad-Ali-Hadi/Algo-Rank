@@ -61,8 +61,8 @@ const forgotPassword = async (req, res) => {
 
     if (insertError) throw insertError;
 
-    // Fire and forget (async) — don't await so the user doesn't wait for timeouts
-    sendOTPEmail(email, otp, 'Password Reset');
+    // Use await — reliability is more important than speed on Render
+    await sendOTPEmail(email, otp, 'Password Reset');
 
     return res.status(200).json({
       message: 'OTP sent to your email. It expires in 10 minutes.',

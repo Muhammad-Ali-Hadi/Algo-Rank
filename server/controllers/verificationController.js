@@ -140,8 +140,8 @@ const initiateVerification = async (email) => {
     throw new Error('Failed to store OTP. ' + error.message);
   }
 
-  // Fire and forget (async) — don't await so the user doesn't wait for timeouts
-  sendOTPEmail(email, otp, 'Email Verification');
+  // Use await — reliability is more important than speed on Render
+  await sendOTPEmail(email, otp, 'Email Verification');
 };
 
 module.exports = { sendVerificationOTP, verifyEmail, initiateVerification };
