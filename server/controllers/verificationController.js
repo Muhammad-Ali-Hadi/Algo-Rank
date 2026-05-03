@@ -3,24 +3,11 @@ const { sendOTPEmail } = require('../services/emailService');
 const { generateToken } = require('../utils/authUtils');
 const crypto = require('crypto');
 
-const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
-const verificationOtpStore = new Map();
+const OTP_EXPIRY_MINUTES = 10;
 
 function generateOTP() {
   return crypto.randomInt(100000, 999999).toString();
 }
-
-/**
- * Clean up expired OTPs periodically
- */
-setInterval(() => {
-  const now = Date.now();
-  for (const [email, data] of verificationOtpStore.entries()) {
-    if (now > data.expiresAt) {
-      verificationOtpStore.delete(email);
-    }
-  }
-}, 15 * 60 * 1000);
 
 // ==================== SEND VERIFICATION OTP ====================
 const sendVerificationOTP = async (req, res) => {
@@ -31,7 +18,7 @@ const sendVerificationOTP = async (req, res) => {
   const email = emailRaw.trim().toLowerCase();
 
   try {
-    // Check if user is already verified
+    // Check if user exists and is not already verified
     const { data: user, error: lookupError } = await supabaseAdmin
       .from('users')
       .select('is_verified')
@@ -46,20 +33,12 @@ const sendVerificationOTP = async (req, res) => {
       return res.status(400).json({ error: 'Email is already verified' });
     }
 
-    // Generate and store OTP
-    const otp = generateOTP();
-    verificationOtpStore.set(email, {
-      otp,
-      expiresAt: Date.now() + OTP_EXPIRY_MS,
-    });
-
-    // Send email
-    await sendOTPEmail(email, otp, 'Email Verification');
+    await initiateVerification(email);
 
     return res.status(200).json({ message: 'Verification OTP sent to your email' });
   } catch (err) {
     console.error('Send verification OTP error:', err);
-    return res.status(500).json({ error: 'Failed to send verification OTP' });
+    return res.status(500).json({ error: 'Failed to send verification OTP. ' + err.message });
   }
 };
 
@@ -73,47 +52,53 @@ const verifyEmail = async (req, res) => {
   }
   const email = emailRaw.trim().toLowerCase();
 
-  const stored = verificationOtpStore.get(email);
-
-  if (!stored) {
-    return res.status(400).json({ error: 'No verification requested or OTP expired' });
-  }
-
-  if (Date.now() > stored.expiresAt) {
-    verificationOtpStore.delete(email);
-    return res.status(400).json({ error: 'OTP has expired' });
-  }
-
-  if (stored.otp !== otp.toString()) {
-    return res.status(400).json({ error: 'Invalid verification OTP' });
-  }
-
   try {
-    // Mark user as verified in database
+    // Fetch from DB (works across serverless/cloud deployments)
+    const { data: stored, error: fetchError } = await supabaseAdmin
+      .from('email_otps')
+      .select('*')
+      .eq('email', email)
+      .eq('type', 'verification')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (fetchError || !stored) {
+      return res.status(400).json({ error: 'No verification requested or OTP expired. Please request a new one.' });
+    }
+
+    if (new Date() > new Date(stored.expires_at)) {
+      // Clean up
+      await supabaseAdmin.from('email_otps').delete().eq('id', stored.id);
+      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+    }
+
+    if (stored.otp !== otp.toString().trim()) {
+      return res.status(400).json({ error: 'Invalid OTP. Please try again.' });
+    }
+
+    // Mark user as verified
     const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({ is_verified: true })
       .eq('email', email);
 
-    if (updateError) {
-      throw updateError;
-    }
+    if (updateError) throw updateError;
 
-    // Clean up
-    verificationOtpStore.delete(email);
+    // Clean up used OTP
+    await supabaseAdmin.from('email_otps').delete().eq('id', stored.id);
 
-    // Fetch user again to get full data for token
+    // Fetch updated user for token
     const { data: updatedUser } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('email', email)
       .single();
 
-    // Generate NEW token with isVerified: true
     const token = generateToken(updatedUser);
 
-    return res.status(200).json({ 
-      message: 'Email verified successfully!', 
+    return res.status(200).json({
+      message: 'Email verified successfully!',
       token,
       user: {
         id: updatedUser.id,
@@ -121,8 +106,8 @@ const verifyEmail = async (req, res) => {
         username: updatedUser.username,
         name: updatedUser.name,
         avatar_url: updatedUser.avatar_url,
-        isVerified: true
-      }
+        isVerified: true,
+      },
     });
   } catch (err) {
     console.error('Verify email error:', err);
@@ -130,12 +115,31 @@ const verifyEmail = async (req, res) => {
   }
 };
 
+// ==================== SHARED: INITIATE VERIFICATION ====================
 const initiateVerification = async (email) => {
   const otp = generateOTP();
-  verificationOtpStore.set(email.toLowerCase(), {
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
+
+  // Delete any old OTPs for this email first
+  await supabaseAdmin
+    .from('email_otps')
+    .delete()
+    .eq('email', email.toLowerCase())
+    .eq('type', 'verification');
+
+  // Insert new OTP into DB
+  const { error } = await supabaseAdmin.from('email_otps').insert({
+    email: email.toLowerCase(),
     otp,
-    expiresAt: Date.now() + OTP_EXPIRY_MS,
+    type: 'verification',
+    expires_at: expiresAt,
   });
+
+  if (error) {
+    console.error('[initiateVerification] DB insert error:', error);
+    throw new Error('Failed to store OTP. ' + error.message);
+  }
+
   await sendOTPEmail(email, otp, 'Email Verification');
 };
 
