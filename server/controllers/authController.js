@@ -81,12 +81,8 @@ const signup = async (req, res) => {
     }
 
     // Send verification OTP
-    try {
-      await initiateVerification(email.toLowerCase());
-    } catch (emailErr) {
-      console.error('Failed to send verification email:', emailErr);
-      // We don't fail signup if email fails, but we should probably warn
-    }
+    // Don't swallow the error here since it silently fails initial OTP delivery
+    await initiateVerification(email.toLowerCase());
 
     // Generate JWT
     const token = generateToken(newUser);
