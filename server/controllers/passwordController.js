@@ -26,7 +26,7 @@ const forgotPassword = async (req, res) => {
   if (!emailRaw) {
     return res.status(400).json({ error: 'Email is required' });
   }
-  const email = emailRaw.trim().toLowerCase();
+  const email = emailRaw.trim().toLowerCase().replace(/,/g, '.');
 
   try {
     // Check if user exists with this email
@@ -37,7 +37,7 @@ const forgotPassword = async (req, res) => {
       .single();
 
     if (lookupError || !user) {
-      return res.status(404).json({ error: 'No account found with this email' });
+      return res.status(404).json({ error: `No account found with email ${email}. Please check your spelling or sign up.` });
     }
 
     // Generate OTP and store in DB for persistence
@@ -82,7 +82,7 @@ const verifyOtp = async (req, res) => {
   if (!emailRaw || !otp) {
     return res.status(400).json({ error: 'Email and OTP are required' });
   }
-  const email = emailRaw.trim().toLowerCase();
+  const email = emailRaw.trim().toLowerCase().replace(/,/g, '.');
 
   try {
     // Fetch from DB
@@ -132,7 +132,7 @@ const resetPassword = async (req, res) => {
   if (!emailRaw || !otp || !newPassword) {
     return res.status(400).json({ error: 'Email, OTP, and new password are required' });
   }
-  const email = emailRaw.trim().toLowerCase();
+  const email = emailRaw.trim().toLowerCase().replace(/,/g, '.');
 
   // Validate new password strength
   if (newPassword.length < 8) {

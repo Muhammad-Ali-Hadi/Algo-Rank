@@ -15,7 +15,8 @@ const sendVerificationOTP = async (req, res) => {
   if (!emailRaw) {
     return res.status(400).json({ error: 'Email is required' });
   }
-  const email = emailRaw.trim().toLowerCase();
+  // Sanitize: replace , with . and trim
+  const email = emailRaw.trim().toLowerCase().replace(/,/g, '.');
 
   try {
     // Check if user exists and is not already verified
@@ -26,7 +27,7 @@ const sendVerificationOTP = async (req, res) => {
       .single();
 
     if (lookupError || !user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: `User with email ${email} not found. Ensure your signup was successful.` });
     }
 
     if (user.is_verified) {
@@ -50,7 +51,7 @@ const verifyEmail = async (req, res) => {
   if (!emailRaw || !otp) {
     return res.status(400).json({ error: 'Email and OTP are required' });
   }
-  const email = emailRaw.trim().toLowerCase();
+  const email = emailRaw.trim().toLowerCase().replace(/,/g, '.');
 
   try {
     // Fetch from DB (works across serverless/cloud deployments)

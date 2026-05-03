@@ -25,5 +25,10 @@ const supabaseAdmin = isRealServiceKey
   : supabase;
 
 const hasAdminAccess = isRealServiceKey;
+if (hasAdminAccess) {
+  console.log('✅ Supabase Admin (Service Role) initialized');
+} else {
+  console.warn('⚠️ Supabase Admin not detected. Falling back to Anon client. Ensure RLS policies allow inserts on email_otps.');
+}
 
 module.exports = { supabase, supabaseAdmin, hasAdminAccess };
