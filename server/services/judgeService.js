@@ -273,28 +273,17 @@ async function evaluateSubmission(submissionId, contestProblemId, problemTitle, 
 
     console.log(`[JudgeService] Evaluating submission ${submissionId.slice(0,8)}... against ${testCases.length} test cases`);
 
-    // 3. Execute concurrently in chunks (e.g., 5 at a time) to drastically reduce turnaround time
-    const CHUNK_SIZE = 5;
+    // 3. Execute sequentially to avoid Free Tier Rate Limits (Judge0 CE blocks >1 req/sec)
     let passedCount = 0;
 
-    for (let i = 0; i < testCases.length; i += CHUNK_SIZE) {
-      const chunk = testCases.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < testCases.length; i++) {
+      const tc = testCases[i];
       
-      const chunkResults = await Promise.allSettled(
-        chunk.map(tc => executeOnJudge0(code, languageId, tc.input || ''))
-      );
+      try {
+        const result = await executeOnJudge0(code, languageId, tc.input || '');
 
-      for (let j = 0; j < chunk.length; j++) {
-        const tc = chunk[j];
-        const res = chunkResults[j];
-
-        if (res.status === 'rejected') {
-          console.error(`[JudgeService] Judge0 execution failed for TC ${tc.order_index}:`, res.reason.message);
-          await updateSubmissionStatus(submissionId, 'runtime_error');
-          return;
-        }
-
-        const result = res.value;
+        // Add a tiny delay to respect Judge0 public API rate limits (1 req/sec)
+        await new Promise(resolve => setTimeout(resolve, 1100));
 
         // Check for compilation error
         if (result.statusId === 6) {
@@ -331,6 +320,10 @@ async function evaluateSubmission(submissionId, contestProblemId, problemTitle, 
         }
 
         passedCount++;
+      } catch (err) {
+        console.error(`[JudgeService] Judge0 execution failed for TC ${tc.order_index}:`, err.message);
+        await updateSubmissionStatus(submissionId, 'runtime_error');
+        return;
       }
     }
 
