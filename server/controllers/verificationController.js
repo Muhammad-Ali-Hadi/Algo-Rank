@@ -68,7 +68,10 @@ const verifyEmail = async (req, res) => {
       return res.status(400).json({ error: 'No verification requested or OTP expired. Please request a new one.' });
     }
 
-    if (new Date() > new Date(stored.expires_at)) {
+    const nowEpoch = Date.now();
+    const expiresEpoch = new Date(stored.expires_at).getTime();
+
+    if (nowEpoch > expiresEpoch) {
       // Clean up
       await supabaseAdmin.from('email_otps').delete().eq('id', stored.id);
       return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
@@ -129,16 +132,17 @@ const initiateVerification = async (email) => {
     .eq('type', 'verification');
 
   // Insert new OTP into DB
+  // Using a 10-minute expiry from CURRENT UTC TIME
   const { error } = await supabaseAdmin.from('email_otps').insert({
     email: email.toLowerCase(),
     otp,
     type: 'verification',
-    expires_at: expiresAt,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
   });
 
   if (error) {
     console.error('[initiateVerification] DB insert error:', error);
-    throw new Error('Failed to store OTP. ' + error.message);
+    throw new Error('Failed to store OTP in database. ' + error.message);
   }
 
   // Non-blocking background send to prevent UI from 'sticking' during SMTP network delays

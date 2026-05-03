@@ -101,8 +101,11 @@ const verifyOtp = async (req, res) => {
       return res.status(400).json({ error: 'No OTP requested or expired. Please request a new one.' });
     }
 
-    // Check expiration
-    if (new Date() > new Date(stored.expires_at)) {
+    // Check expiration using UTC Epoch for timezone independence
+    const nowEpoch = Date.now();
+    const expiresEpoch = new Date(stored.expires_at).getTime();
+
+    if (nowEpoch > expiresEpoch) {
       await supabaseAdmin.from('email_otps').delete().eq('id', stored.id);
       return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
     }
