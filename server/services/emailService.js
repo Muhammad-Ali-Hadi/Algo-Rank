@@ -29,15 +29,22 @@ async function sendOTPEmail(toRaw, otp, type = 'Password Reset') {
         subject: `AlgoRank: ${type} OTP`,
         textContent: `Your ${type} code is: ${otp}. It will expire in 10 minutes.`,
         htmlContent: `
-          <div style="font-family: Arial, sans-serif; padding: 25px; border: 1px solid #1F6FEB; border-radius: 12px; max-width: 500px; background-color: #fcfcfc;">
-            <h2 style="color: #1F6FEB; margin-top: 0;">AlgoRank Verification</h2>
-            <p style="font-size: 16px;">Your <strong>${type.toLowerCase()}</strong> code is:</p>
-            <div style="font-size: 36px; font-weight: bold; color: #1F6FEB; margin: 25px 0; text-align: center; background: #f0f7ff; padding: 15px; border-radius: 8px; letter-spacing: 5px;">
+          <div style="font-family: Arial, sans-serif; padding: 40px 20px; max-width: 600px; margin: 0 auto; background-color: #0d1117; color: #e6edf3; text-align: center; border-radius: 12px;">
+            <h1 style="color: #3b82f6; font-size: 24px; margin-bottom: 5px;">AlgoRank</h1>
+            <p style="color: #8b949e; font-size: 14px; margin-top: 0; margin-bottom: 30px;">${type} Request</p>
+            
+            <p style="font-size: 15px; color: #c9d1d9; margin-bottom: 30px;">
+              You requested a ${type.toLowerCase()}. Use the OTP below to verify your identity.
+            </p>
+            
+            <div style="background-color: #2563eb; color: #ffffff; font-size: 36px; font-weight: bold; letter-spacing: 12px; padding: 20px 30px; border-radius: 12px; display: inline-block; margin-bottom: 30px;">
               ${otp}
             </div>
-            <p style="font-size: 14px; color: #555;">This code will expire in 10 minutes.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
-            <p style="font-size: 11px; color: #999;">If you didn't request this code, you can safely ignore this email.</p>
+            
+            <p style="font-size: 12px; color: #8b949e; margin-top: 20px;">
+              This code will expire in 10 minutes.<br>
+              If you didn't request this code, you can safely ignore this email.
+            </p>
           </div>
         `
       })
