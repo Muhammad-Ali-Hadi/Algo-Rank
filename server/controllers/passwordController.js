@@ -61,10 +61,8 @@ const forgotPassword = async (req, res) => {
 
     if (insertError) throw insertError;
 
-    // Non-blocking background send to prevent UI from 'sticking' during SMTP network delays
-    setImmediate(() => {
-      sendOTPEmail(email, otp, 'Password Reset');
-    });
+    // Use await for Vercel/Serverless compatibility (prevents silent background failure)
+    await sendOTPEmail(email, otp, 'Password Reset');
 
     return res.status(200).json({
       message: 'OTP sent to your email. It expires in 10 minutes.',

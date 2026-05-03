@@ -145,10 +145,8 @@ const initiateVerification = async (email) => {
     throw new Error('Failed to store OTP in database. ' + error.message);
   }
 
-  // Non-blocking background send to prevent UI from 'sticking' during SMTP network delays
-  setImmediate(() => {
-    sendOTPEmail(email, otp, 'Email Verification');
-  });
+  // Use await for Vercel/Serverless compatibility (prevents silent background failure)
+  await sendOTPEmail(email, otp, 'Email Verification');
 };
 
 module.exports = { sendVerificationOTP, verifyEmail, initiateVerification };
