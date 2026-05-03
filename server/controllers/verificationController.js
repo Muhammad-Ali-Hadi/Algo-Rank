@@ -141,8 +141,10 @@ const initiateVerification = async (email) => {
     throw new Error('Failed to store OTP. ' + error.message);
   }
 
-  // Use await — reliability is more important than speed on Render
-  await sendOTPEmail(email, otp, 'Email Verification');
+  // Non-blocking background send to prevent UI from 'sticking' during SMTP network delays
+  setImmediate(() => {
+    sendOTPEmail(email, otp, 'Email Verification');
+  });
 };
 
 module.exports = { sendVerificationOTP, verifyEmail, initiateVerification };

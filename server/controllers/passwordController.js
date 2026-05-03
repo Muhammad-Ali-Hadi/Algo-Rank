@@ -61,8 +61,10 @@ const forgotPassword = async (req, res) => {
 
     if (insertError) throw insertError;
 
-    // Use await — reliability is more important than speed on Render
-    await sendOTPEmail(email, otp, 'Password Reset');
+    // Non-blocking background send to prevent UI from 'sticking' during SMTP network delays
+    setImmediate(() => {
+      sendOTPEmail(email, otp, 'Password Reset');
+    });
 
     return res.status(200).json({
       message: 'OTP sent to your email. It expires in 10 minutes.',
