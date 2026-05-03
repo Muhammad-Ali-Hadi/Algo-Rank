@@ -1,5 +1,4 @@
 require('dotenv').config(); // Reloaded config to fix email issues
-const dns = require('dns');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -15,10 +14,6 @@ const { globalThrottler } = require('./middleware/throttler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
-if (typeof dns.setDefaultResultOrder === 'function') {
-  dns.setDefaultResultOrder('ipv4first');
-}
 
 // Middleware
 app.use(helmet());

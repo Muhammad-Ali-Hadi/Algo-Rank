@@ -1,51 +1,36 @@
-const dns = require('dns');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-if (typeof dns.setDefaultResultOrder === 'function') {
-  dns.setDefaultResultOrder('ipv4first');
+let resendInstance = null;
+
+function getResendClient() {
+  if (!resendInstance && process.env.RESEND_API_KEY) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendInstance;
 }
-
-const smtpLookup = (hostname, options, callback) => {
-  dns.lookup(hostname, { ...options, family: 4 }, callback);
-};
 
 /**
  * Send an OTP email to the user.
  */
 async function sendOTPEmail(toRaw, otp, type = 'Password Reset') {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.error('[Email] Missing credentials (EMAIL_USER/EMAIL_PASS)');
+  const resend = getResendClient();
+  
+  if (!resend) {
+    console.error('[Email] Missing RESEND_API_KEY credentials');
     return;
   }
 
   // Sanitize: Gmail sometimes gets typos like .com becoming ,com
   const to = toRaw.trim().toLowerCase().replace(/,/g, '.');
 
-  // THE ULTIMATE RENDER FIX: Force IPv4 to prevent ENETUNREACH
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    family: 4,
-    lookup: smtpLookup,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-      servername: 'smtp.gmail.com',
-      minVersion: 'TLSv1.2',
-    },
-    // Increase timeout for cross-region deployments
-    connectionTimeout: 20000, 
-    greetingTimeout: 20000,
-    socketTimeout: 60000
-  });
+  const fromEmail = process.env.EMAIL_USER || 'onboarding@resend.dev';
 
   try {
-    const mailOptions = {
-      from: `"AlgoRank" <${process.env.EMAIL_USER}>`,
-      to,
+    console.log(`[Email] Attempting to send ${type} to ${to} via Resend...`);
+    
+    const { data, error } = await resend.emails.send({
+      from: `AlgoRank <${fromEmail}>`,
+      to: [to],
       subject: `AlgoRank: ${type} OTP`,
       text: `Your ${type} code is: ${otp}. It will expire in 10 minutes.`,
       html: `
@@ -59,15 +44,18 @@ async function sendOTPEmail(toRaw, otp, type = 'Password Reset') {
           <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
           <p style="font-size: 11px; color: #999;">If you didn't request this code, you can safely ignore this email.</p>
         </div>
-      `,
-    };
+      `
+    });
 
-    console.log(`[Email] Attempting to send ${type} to ${to} (Forced IPv4)...`);
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[Email] ✅ SUCCESS: Delivered to ${to} (ID: ${info.messageId})`);
-    return info;
+    if (error) {
+      console.error(`[Email] ❌ FAILED for ${to}:`, error.message);
+      throw new Error(error.message);
+    }
+
+    console.log(`[Email] ✅ SUCCESS: Delivered to ${to} (ID: ${data.id})`);
+    return data;
   } catch (err) {
-    console.error(`[Email] ❌ FAILED for ${to}:`, err.message);
+    console.error(`[Email] ❌ Exception FAILED for ${to}:`, err.message);
     throw err;
   }
 }
