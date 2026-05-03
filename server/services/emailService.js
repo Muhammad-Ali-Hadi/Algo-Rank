@@ -4,60 +4,6 @@
 // =============================================
 
 const nodemailer = require('nodemailer');
-const dns = require('dns');
-const { promisify } = require('util');
-const lookup = promisify(dns.lookup);
-
-// Cache variables for performance
-let _transporter = null;
-let _resolvedHostIp = null;
-
-/**
- * Resolves the SMTP host to an IPv4 address once and caches it.
- * This saves time on every email send and fixes Render's IPv6 issues.
- */
-async function getResolvedHost() {
-  if (_resolvedHostIp) return _resolvedHostIp;
-  try {
-    const { address } = await lookup('smtp.gmail.com', { family: 4 });
-    _resolvedHostIp = address;
-    console.log(`[Email] Cached smtp.gmail.com IPv4: ${_resolvedHostIp}`);
-    return _resolvedHostIp;
-  } catch (err) {
-    console.warn('[Email] DNS lookup failed, using hostname:', err.message);
-    return 'smtp.gmail.com';
-  }
-}
-
-async function getTransporter() {
-  if (_transporter) return _transporter;
-
-  const host = await getResolvedHost();
-
-  _transporter = nodemailer.createTransport({
-    host: host,
-    port: 587,
-    secure: false, // STARTTLS
-    requireTLS: true,
-    pool: true, // Use pooling for speed
-    maxConnections: 3,
-    maxMessages: 100,
-    connectionTimeout: 5000, // Fast connection timeout
-    greetingTimeout: 5000,
-    socketTimeout: 30000,
-    family: 4, 
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false,
-      servername: 'smtp.gmail.com'
-    }
-  });
-
-  return _transporter;
-}
 
 /**
  * Send an OTP email to the user.
@@ -67,38 +13,45 @@ async function getTransporter() {
  */
 async function sendOTPEmail(to, otp, type = 'Password Reset') {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error('EMAIL_USER and EMAIL_PASS environment variables are not set on the server.');
+    console.error('[Email] Missing EMAIL_USER or EMAIL_PASS environment variables');
+    return;
   }
 
-  const transporter = await getTransporter();
+  // Use the most basic config — often most reliable on cloud platforms
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    }
+  });
 
   const mailOptions = {
     from: `"AlgoRank" <${process.env.EMAIL_USER}>`,
-    to,
+    to: to.trim().toLowerCase(),
     subject: `AlgoRank — ${type} OTP`,
-    text: `Your ${type} code is: ${otp}. It expires in 10 minutes.`,
+    text: `Your ${type} code is: ${otp}`,
     html: `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 16px; padding: 40px; color: #e5e7eb;">
-        <h2 style="text-align: center; color: #58A6FF; margin-bottom: 8px;">AlgoRank</h2>
-        <p style="text-align: center; color: #6B7280; font-size: 14px; margin-bottom: 32px;">${type}</p>
-        <p style="font-size: 14px; line-height: 1.6;">Use the OTP below to verify your identity for ${type.toLowerCase()}:</p>
-        <div style="text-align: center; margin: 28px 0;">
-          <span style="display: inline-block; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #ffffff; background: linear-gradient(135deg, #1F6FEB, #58A6FF); padding: 16px 32px; border-radius: 12px;">${otp}</span>
+      <div style="font-family: sans-serif; padding: 20px; color: #333;">
+        <h2 style="color: #1F6FEB;">AlgoRank</h2>
+        <p>Your <strong>${type.toLowerCase()}</strong> code is:</p>
+        <div style="font-size: 32px; font-weight: bold; margin: 20px 0; color: #1F6FEB;">
+          ${otp}
         </div>
-        <p style="font-size: 13px; color: #6B7280; text-align: center;">This code expires in <strong style="color: #e5e7eb;">10 minutes</strong>.</p>
-        <p style="font-size: 12px; color: #4B5563; text-align: center; margin-top: 32px;">If you didn't request this, you can safely ignore this email.</p>
+        <p>This code expires in 10 minutes.</p>
+        <p style="font-size: 12px; color: #666;">If you didn't request this, please ignore this email.</p>
       </div>
     `,
   };
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[Email] OTP sent to ${to} — messageId: ${info.messageId}`);
+    console.log(`[Email] Success: ${to} (${info.messageId})`);
     return info;
   } catch (err) {
-    console.error(`[Email] Failed to send OTP to ${to}:`, err.message);
-    // Reset transporter so it's re-verified on next attempt
-    _transporter = null;
+    console.error(`[Email] Error: ${to} ->`, err.message);
+    // Don't throw the error so the user's DB operation isn't rolled back 
+    // unless you want them to see the failure.
     throw err;
   }
 }
