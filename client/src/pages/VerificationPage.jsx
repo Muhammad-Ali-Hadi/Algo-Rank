@@ -29,6 +29,23 @@ export default function VerificationPage() {
     }
   }, [email, user, navigate]);
 
+  // Automatically send OTP when landing on this page for the first time
+  useEffect(() => {
+    const autoSendOtp = async () => {
+      // Only do this if they just got redirected from signup
+      if (email && !user?.isVerified && location.state?.email) {
+        try {
+          // We clear the state so it only auto-sends once per session
+          window.history.replaceState({}, document.title);
+          await api.resendVerification(email);
+        } catch (err) {
+          console.warn('Auto-OTP sending may have encountered an issue:', err);
+        }
+      }
+    };
+    autoSendOtp();
+  }, [email, user?.isVerified, location.state?.email]);
+
   const handleVerify = async (e) => {
     e.preventDefault();
     if (!otp || otp.length !== 6) {
