@@ -8,31 +8,41 @@ const dns = require('dns');
 const { promisify } = require('util');
 const lookup = promisify(dns.lookup);
 
-// Lazily create transporter so missing env vars don't crash the whole server at startup
+// Cache variables for performance
 let _transporter = null;
+let _resolvedHostIp = null;
+
+/**
+ * Resolves the SMTP host to an IPv4 address once and caches it.
+ * This saves time on every email send and fixes Render's IPv6 issues.
+ */
+async function getResolvedHost() {
+  if (_resolvedHostIp) return _resolvedHostIp;
+  try {
+    const { address } = await lookup('smtp.gmail.com', { family: 4 });
+    _resolvedHostIp = address;
+    console.log(`[Email] Cached smtp.gmail.com IPv4: ${_resolvedHostIp}`);
+    return _resolvedHostIp;
+  } catch (err) {
+    console.warn('[Email] DNS lookup failed, using hostname:', err.message);
+    return 'smtp.gmail.com';
+  }
+}
 
 async function getTransporter() {
   if (_transporter) return _transporter;
 
-  let host = 'smtp.gmail.com';
-  
-  try {
-    // Force IPv4 resolution manually to bypass ENETUNREACH IPv6 issues on Render
-    const { address } = await lookup('smtp.gmail.com', { family: 4 });
-    host = address;
-    console.log(`[Email] Resolved smtp.gmail.com to IPv4: ${host}`);
-  } catch (dnsErr) {
-    console.warn('[Email] DNS lookup failed for smtp.gmail.com, falling back to hostname:', dnsErr.message);
-  }
+  const host = await getResolvedHost();
 
   _transporter = nodemailer.createTransport({
     host: host,
-    port: 465,
-    secure: true,
-    pool: true, 
-    maxConnections: 5,
+    port: 587,
+    secure: false, // STARTTLS
+    requireTLS: true,
+    pool: true, // Use pooling for speed
+    maxConnections: 3,
     maxMessages: 100,
-    connectionTimeout: 10000, 
+    connectionTimeout: 5000, // Fast connection timeout
     greetingTimeout: 5000,
     socketTimeout: 30000,
     family: 4, 
@@ -43,17 +53,6 @@ async function getTransporter() {
     tls: {
       rejectUnauthorized: false,
       servername: 'smtp.gmail.com'
-    },
-    debug: true,
-    logger: true
-  });
-
-  // Verify on first use
-  _transporter.verify((err) => {
-    if (err) {
-      console.error('❌ Email transporter error:', err.message);
-    } else {
-      console.log('✅ Email transporter ready — sending from:', process.env.EMAIL_USER);
     }
   });
 
