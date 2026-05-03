@@ -140,10 +140,8 @@ const initiateVerification = async (email) => {
     throw new Error('Failed to store OTP. ' + error.message);
   }
 
-  // Fire and forget (async) — don't await so the user gets a fast response
-  sendOTPEmail(email, otp, 'Email Verification')
-    .then(() => console.log(`[Email] Background send success to ${email}`))
-    .catch(err => console.error(`[Email] Background send failed to ${email}:`, err.message));
+  // Use await to ensure the email is sent before the request finishes
+  await sendOTPEmail(email, otp, 'Email Verification');
 };
 
 module.exports = { sendVerificationOTP, verifyEmail, initiateVerification };
