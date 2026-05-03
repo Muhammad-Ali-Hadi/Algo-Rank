@@ -1,4 +1,13 @@
+const dns = require('dns');
 const nodemailer = require('nodemailer');
+
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
+const smtpLookup = (hostname, options, callback) => {
+  dns.lookup(hostname, { ...options, family: 4 }, callback);
+};
 
 /**
  * Send an OTP email to the user.
@@ -17,12 +26,17 @@ async function sendOTPEmail(toRaw, otp, type = 'Password Reset') {
     host: 'smtp.gmail.com',
     port: 465,
     secure: true,
-    family: 4, // CRITICAL: This disables IPv6 and fixes the ENETUNREACH error on Render
+    family: 4,
+    lookup: smtpLookup,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
-    // Increase timeout for Singapore to US connectivity
+    tls: {
+      servername: 'smtp.gmail.com',
+      minVersion: 'TLSv1.2',
+    },
+    // Increase timeout for cross-region deployments
     connectionTimeout: 20000, 
     greetingTimeout: 20000,
     socketTimeout: 60000

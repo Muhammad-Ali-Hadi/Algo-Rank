@@ -5,6 +5,27 @@ const crypto = require('crypto');
 
 const OTP_EXPIRY_MINUTES = 10;
 
+function parseUtcTimestamp(value) {
+  if (!value) return NaN;
+
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+    const hasTimezone = /([zZ]|[+-]\d\d:?\d\d)$/.test(normalized);
+    return Date.parse(hasTimezone ? normalized : `${normalized}Z`);
+  }
+
+  return Date.parse(value);
+}
+
+function isOtpExpired(expiresAt) {
+  const expiresEpoch = parseUtcTimestamp(expiresAt);
+  return Number.isNaN(expiresEpoch) || Date.now() > expiresEpoch;
+}
+
 function generateOTP() {
   return crypto.randomInt(100000, 999999).toString();
 }
@@ -68,10 +89,7 @@ const verifyEmail = async (req, res) => {
       return res.status(400).json({ error: 'No verification requested or OTP expired. Please request a new one.' });
     }
 
-    const nowEpoch = Date.now();
-    const expiresEpoch = new Date(stored.expires_at).getTime();
-
-    if (nowEpoch > expiresEpoch) {
+    if (isOtpExpired(stored.expires_at)) {
       // Clean up
       await supabaseAdmin.from('email_otps').delete().eq('id', stored.id);
       return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
@@ -131,13 +149,12 @@ const initiateVerification = async (email) => {
     .eq('email', email.toLowerCase())
     .eq('type', 'verification');
 
-  // Insert new OTP into DB
-  // Using a 10-minute expiry from CURRENT UTC TIME
+  // Insert new OTP into DB using an explicit UTC timestamp.
   const { error } = await supabaseAdmin.from('email_otps').insert({
     email: email.toLowerCase(),
     otp,
     type: 'verification',
-    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    expires_at: expiresAt,
   });
 
   if (error) {

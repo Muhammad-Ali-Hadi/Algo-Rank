@@ -12,6 +12,27 @@ const { sendOTPEmail } = require('../services/emailService');
 const SALT_ROUNDS = 10;
 const OTP_EXPIRY_MINUTES = 10; // Increased to 10 for better UX
 
+function parseUtcTimestamp(value) {
+  if (!value) return NaN;
+
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+    const hasTimezone = /([zZ]|[+-]\d\d:?\d\d)$/.test(normalized);
+    return Date.parse(hasTimezone ? normalized : `${normalized}Z`);
+  }
+
+  return Date.parse(value);
+}
+
+function isOtpExpired(expiresAt) {
+  const expiresEpoch = parseUtcTimestamp(expiresAt);
+  return Number.isNaN(expiresEpoch) || Date.now() > expiresEpoch;
+}
+
 /**
  * Generate a secure 6-digit numeric OTP
  */
@@ -100,10 +121,7 @@ const verifyOtp = async (req, res) => {
     }
 
     // Check expiration using UTC Epoch for timezone independence
-    const nowEpoch = Date.now();
-    const expiresEpoch = new Date(stored.expires_at).getTime();
-
-    if (nowEpoch > expiresEpoch) {
+    if (isOtpExpired(stored.expires_at)) {
       await supabaseAdmin.from('email_otps').delete().eq('id', stored.id);
       return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
     }
@@ -156,7 +174,7 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ error: 'Invalid OTP or session expired.' });
     }
 
-    if (new Date() > new Date(stored.expires_at)) {
+    if (isOtpExpired(stored.expires_at)) {
       await supabaseAdmin.from('email_otps').delete().eq('id', stored.id);
       return res.status(400).json({ error: 'OTP has expired.' });
     }
