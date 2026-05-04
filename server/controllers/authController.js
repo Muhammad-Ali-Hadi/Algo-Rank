@@ -176,7 +176,7 @@ const getProfile = async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
       .from('users')
-      .select('id, email, username, name, avatar_url, created_at')
+      .select('id, email, username, name, avatar_url, created_at, is_verified')
       .eq('id', req.user.id)
       .single();
 

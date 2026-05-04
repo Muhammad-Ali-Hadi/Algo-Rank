@@ -228,13 +228,20 @@ async function fetchAllTestCases(problemId) {
  * Execute code against a single input via Judge0 (synchronous wait mode).
  * Returns { statusId, stdout, stderr, compile_output, time, memory }
  */
-async function executeOnJudge0(code, languageId, stdin) {
+async function executeOnJudge0(code, languageId, stdin, timeLimitMs = 5000, memoryLimitMB = 256) {
+  // Convert milliseconds to seconds (Judge0 uses seconds)
+  const timeLimitSec = Math.max(0.5, timeLimitMs / 1000);
+  // Convert MB to KB (Judge0 uses KB)
+  const memoryLimitKB = memoryLimitMB * 1024;
+  
   const payload = {
     source_code: b64Encode(code),
     language_id: languageId,
     stdin: b64Encode(stdin),
-    cpu_time_limit: JUDGE0_TIMEOUT,
-    wall_time_limit: JUDGE0_TIMEOUT * 2,
+    cpu_time_limit: timeLimitSec,
+    wall_time_limit: timeLimitSec * 2,
+    memory_limit: memoryLimitKB,
+    stack_limit: memoryLimitKB, // Crucial for deep recursion in C++
   };
 
   const headers = buildHeaders();
@@ -404,14 +411,17 @@ async function evaluateSubmission(submissionId, contestProblemId, problemTitle, 
     // but much faster than sequential + 1.1s delay.
     let passedCount = 0;
     const CONCURRENCY_LIMIT = 5;
-    const results = [];
+    
+    // Extract limits from problem bank (with defaults)
+    const timeLimit   = problem?.time_limit   || 5000;
+    const memoryLimit = problem?.memory_limit || 256;
 
     // Process test cases in chunks to respect rate limits while maintaining speed
     for (let i = 0; i < testCases.length; i += CONCURRENCY_LIMIT) {
       const chunk = testCases.slice(i, i + CONCURRENCY_LIMIT);
       const chunkPromises = chunk.map(async (tc) => {
         try {
-          const result = await executeOnJudge0(code, languageId, tc.input || '');
+          const result = await executeOnJudge0(code, languageId, tc.input || '', timeLimit, memoryLimit);
           return { tc, result, error: null };
         } catch (err) {
           return { tc, result: null, error: err };
