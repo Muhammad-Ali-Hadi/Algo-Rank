@@ -4,7 +4,7 @@
 
 AlgoRank is a high-performance, premium competitive programming platform designed for the modern era. Inspired by VJudge but reimagined with a sleek, neon-dark aesthetic and robust internal judging, AlgoRank allows users to practice, compete, and climb the global leaderboard.
 
-![AlgoRank Preview](https://via.placeholder.com/1200x600/0a0a0a/58A6FF?text=AlgoRank+-+Compete.+Solve.+Rank.)
+![AlgoRank Preview](algo-rank-fast.vercel.app)
 
 ---
 
