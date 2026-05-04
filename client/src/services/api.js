@@ -46,6 +46,11 @@ async function fetchWithAuth(endpoint, options = {}) {
     }
 
     const data = await response.json();
+    
+    // Clear the entire cache on any state-changing request to prevent stale data
+    if (!isGet) {
+      cache.clear();
+    }
 
     if (isGet) {
       cache.set(endpoint, { timestamp: Date.now(), data });

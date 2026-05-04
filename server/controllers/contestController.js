@@ -375,7 +375,7 @@ const updateContest = async (req, res) => {
     // Check ownership or admin
     const { data: contest, error: fetchErr } = await supabaseAdmin
       .from('contests')
-      .select('creator_id, start_time')
+      .select('creator_id, start_time, end_time, type')
       .eq('id', id)
       .single();
 
@@ -407,6 +407,17 @@ const updateContest = async (req, res) => {
     if (visibility !== undefined) updates.visibility = visibility;
     if (freeze_time !== undefined) updates.freeze_time = freeze_time;
     if (unfreeze_time !== undefined) updates.unfreeze_time = unfreeze_time;
+
+    // IMPORTANT: Recalculate end_time for local contests if duration/start_time changed
+    if (contest.type === 'local' && end_time === undefined) {
+      const finalStartTime = updates.start_time || contest.start_time;
+      const finalDuration = updates.duration_seconds !== undefined ? updates.duration_seconds : contest.duration_seconds;
+      
+      if (finalStartTime && finalDuration) {
+        const newEndDate = new Date(new Date(finalStartTime).getTime() + finalDuration * 1000);
+        updates.end_time = newEndDate.toISOString();
+      }
+    }
 
     let { data: updated, error: updateErr } = await supabaseAdmin
       .from('contests')
