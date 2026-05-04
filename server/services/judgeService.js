@@ -241,7 +241,7 @@ async function executeOnJudge0(code, languageId, stdin, timeLimitMs = 5000, memo
     cpu_time_limit: timeLimitSec,
     wall_time_limit: timeLimitSec * 2,
     memory_limit: memoryLimitKB,
-    stack_limit: memoryLimitKB, // Crucial for deep recursion in C++
+    stack_limit: Math.min(memoryLimitKB, 128000), // Capped at 128MB (Judge0 CE limit)
   };
 
   const headers = buildHeaders();
