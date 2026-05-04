@@ -61,13 +61,114 @@ function buildHeaders() {
  */
 function normalizeOutput(str) {
   if (!str) return '';
+  // Token-based normalization (Codeforces-style): ignore whitespace-only diffs.
+  // This avoids false WAs when solutions print equivalent output with different
+  // spacing/newlines.
   return str
-    .replace(/\r\n/g, '\n')   // Windows → Unix line endings
-    .replace(/\r/g, '\n')     // Old Mac → Unix
-    .split('\n')
-    .map(line => line.trimEnd()) // Remove trailing spaces per line
-    .join('\n')
-    .trim();                   // Remove leading/trailing whitespace
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * Normalize a contest/problem title for lookup in the global problems bank.
+ * Handles Codeforces-style prefixes like "A. Watermelon" → "Watermelon".
+ */
+function normalizeProblemTitle(title) {
+  if (!title) return '';
+  let normalized = String(title).trim();
+
+  // Strip a leading index like "A.", "A1.", "B2." etc.
+  normalized = normalized.replace(/^[A-Za-z]\d{0,2}\.\s+/, '');
+  // Also handle variants like "A - X" or "A: X".
+  normalized = normalized.replace(/^[A-Za-z]\d{0,2}\s*[-:]\s+/, '');
+
+  // Collapse multiple spaces.
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+  return normalized;
+}
+
+/**
+ * Resolve candidate problems for judging in priority order.
+ * We intentionally avoid `.single()` to prevent failures when duplicates exist.
+ */
+async function getProblemCandidates(contestProblemId, problemTitle) {
+  const candidates = [];
+
+  // 1) Prefer the fork linked to this contest problem (if any).
+  const forkRes = await supabaseAdmin
+    .from('problems')
+    .select('id, title, time_limit, forked_from_contest_problem')
+    .eq('forked_from_contest_problem', contestProblemId)
+    .limit(5);
+  if (forkRes?.data?.length) {
+    candidates.push(...forkRes.data);
+  }
+
+  // 2) Try global bank by raw + normalized title (case-insensitive).
+  const rawTitle = String(problemTitle || '').trim();
+  const normalizedTitle = normalizeProblemTitle(rawTitle);
+  const titlesToTry = Array.from(new Set([rawTitle, normalizedTitle].filter(Boolean)));
+
+  for (const t of titlesToTry) {
+    const globalRes = await supabaseAdmin
+      .from('problems')
+      .select('id, title, time_limit, forked_from_contest_problem')
+      .is('forked_from_contest_problem', null)
+      .ilike('title', t)
+      .limit(5);
+    if (globalRes?.data?.length) {
+      candidates.push(...globalRes.data);
+    }
+  }
+
+  // 3) As a last resort, try a fuzzy contains match on the normalized title.
+  if (normalizedTitle && normalizedTitle !== rawTitle) {
+    const fuzzyRes = await supabaseAdmin
+      .from('problems')
+      .select('id, title, time_limit, forked_from_contest_problem')
+      .is('forked_from_contest_problem', null)
+      .ilike('title', `%${normalizedTitle}%`)
+      .limit(5);
+    if (fuzzyRes?.data?.length) {
+      candidates.push(...fuzzyRes.data);
+    }
+  }
+
+  // Deduplicate by id while preserving priority order.
+  const seen = new Set();
+  return candidates.filter(p => {
+    if (!p?.id || seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
+}
+
+/**
+ * Fallback: use contest_problems.scraped_samples as test cases.
+ * Note: These are usually sample tests only (hidden tests may not exist here).
+ */
+async function fetchContestProblemSampleTestCases(contestProblemId) {
+  const { data, error } = await supabaseAdmin
+    .from('contest_problems')
+    .select('scraped_samples')
+    .eq('id', contestProblemId)
+    .single();
+
+  if (error || !data?.scraped_samples || !Array.isArray(data.scraped_samples)) return [];
+
+  return data.scraped_samples
+    .map((s, idx) => ({
+      id: `scraped:${contestProblemId}:${idx}`,
+      input: s?.input || '',
+      expected_output: s?.output || '',
+      is_hidden: false,
+      order_index: idx,
+    }))
+    .filter(tc => tc.input !== '' || tc.expected_output !== '');
 }
 
 /**
@@ -237,41 +338,67 @@ async function evaluateSubmission(submissionId, contestProblemId, problemTitle, 
   }
 
   try {
-    // 1. Resolve the problem from the problems bank
-    // First, try to find a fork specifically for this contest problem
-    let { data: problem } = await supabaseAdmin
-      .from('problems')
-      .select('id, time_limit')
-      .eq('forked_from_contest_problem', contestProblemId)
-      .single();
+    // 1) Resolve the best problem candidate AND ensure it has test cases.
+    const candidates = await getProblemCandidates(contestProblemId, problemTitle);
 
-    // If no fork, fallback to searching by title in the global bank (where forked_from is null)
+    let problem = null;
+    let testCases = [];
+
+    const forkCandidates = candidates.filter(p => p?.forked_from_contest_problem === contestProblemId);
+    const globalCandidates = candidates.filter(p => !p?.forked_from_contest_problem);
+
+    const pickBest = async (candidateList) => {
+      let best = null;
+      let bestCases = [];
+      let bestHiddenCount = -1;
+      let bestTotalCount = -1;
+
+      for (const candidate of candidateList) {
+        const candidateCases = await fetchAllTestCases(candidate.id);
+        if (candidateCases.length === 0) continue;
+
+        const hiddenCount = candidateCases.reduce((acc, tc) => acc + (tc.is_hidden ? 1 : 0), 0);
+        const totalCount = candidateCases.length;
+
+        if (
+          hiddenCount > bestHiddenCount ||
+          (hiddenCount === bestHiddenCount && totalCount > bestTotalCount)
+        ) {
+          best = candidate;
+          bestCases = candidateCases;
+          bestHiddenCount = hiddenCount;
+          bestTotalCount = totalCount;
+        }
+      }
+
+      return { best, bestCases };
+    };
+
+    // Preserve original intent: if a fork exists with test cases, use it.
+    const forkPick = await pickBest(forkCandidates);
+    if (forkPick.best) {
+      problem = forkPick.best;
+      testCases = forkPick.bestCases;
+    } else {
+      const globalPick = await pickBest(globalCandidates);
+      problem = globalPick.best;
+      testCases = globalPick.bestCases;
+    }
+
+    // 2) Fallback: use contest scraped samples (prevents false WA when bank lookup fails).
     if (!problem) {
-      const { data: globalProb } = await supabaseAdmin
-        .from('problems')
-        .select('id, time_limit')
-        .eq('title', problemTitle)
-        .is('forked_from_contest_problem', null)
-        .single();
-      problem = globalProb;
+      testCases = await fetchContestProblemSampleTestCases(contestProblemId);
+      if (testCases.length > 0) {
+        console.warn(`[JudgeService] Using contest scraped samples for "${problemTitle}" (bank lookup missing). Hidden tests may be unavailable.`);
+      } else {
+        console.warn(`[JudgeService] No problem/test cases resolved for title: "${problemTitle}". Marking WA to prevent false AC.`);
+        await updateSubmissionStatus(submissionId, 'wrong_answer');
+        return;
+      }
     }
 
-    if (!problem) {
-      console.warn(`[JudgeService] No problem found in bank for title: "${problemTitle}". Marking WA to prevent false AC.`);
-      await updateSubmissionStatus(submissionId, 'wrong_answer');
-      return;
-    }
-
-    // 2. Fetch all test cases (cached)
-    const testCases = await fetchAllTestCases(problem.id);
-
-    if (testCases.length === 0) {
-      console.warn(`[JudgeService] No test cases for problem "${problemTitle}". Marking WA.`);
-      await updateSubmissionStatus(submissionId, 'wrong_answer');
-      return;
-    }
-
-    console.log(`[JudgeService] Evaluating submission ${submissionId.slice(0,8)}... against ${testCases.length} test cases`);
+    const problemLabel = problem?.title ? `"${problem.title}"` : `"${problemTitle}"`;
+    console.log(`[JudgeService] Evaluating submission ${submissionId.slice(0,8)}... against ${testCases.length} test cases for ${problemLabel}`);
 
     // 3. Execute sequentially to avoid Free Tier Rate Limits (Judge0 CE blocks >1 req/sec)
     let passedCount = 0;

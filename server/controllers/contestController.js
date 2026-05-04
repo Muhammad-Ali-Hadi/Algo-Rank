@@ -27,11 +27,17 @@ const validateUniqueProblems = (problemsArray) => {
     if (p.id) {
       if (seenIds.has(p.id)) return 'A contest cannot contain duplicate problems. Please ensure each problem is added only once.';
       seenIds.add(p.id);
-    } else if (p.title) {
-      const lowerTitle = p.title.toLowerCase();
-      if (seenTitles.has(lowerTitle)) return `A contest cannot contain duplicate problems. The problem "${p.title}" was added multiple times.`;
-      seenTitles.add(lowerTitle);
-    } else if (p.url) {
+    }
+
+    if (p.title) {
+      const lowerTitle = String(p.title).trim().toLowerCase().replace(/\s+/g, ' ');
+      if (lowerTitle) {
+        if (seenTitles.has(lowerTitle)) return `A contest cannot contain duplicate problems. The problem "${String(p.title).trim()}" was added multiple times.`;
+        seenTitles.add(lowerTitle);
+      }
+    }
+
+    if (p.url) {
       if (seenUrls.has(p.url)) return 'A contest cannot contain duplicate problems. Please ensure each problem URL is added only once.';
       seenUrls.add(p.url);
     }
@@ -44,7 +50,10 @@ const processProblemsForContest = async (contestId, problemsArray) => {
   if (!problemsArray || problemsArray.length === 0) return;
 
   const problemIds = problemsArray.filter(p => p.id).map(p => p.id);
-  const problemTitles = problemsArray.filter(p => !p.id && p.title).map(p => p.title);
+  const problemTitles = problemsArray
+    .filter(p => !p.id && p.title)
+    .map(p => String(p.title).trim())
+    .filter(Boolean);
 
   let dbProblems = [];
   let dbTestCases = [];
@@ -74,13 +83,35 @@ const processProblemsForContest = async (contestId, problemsArray) => {
     }
   }
 
+  const normalizeTitle = (t) => String(t || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const byCreatedAtAsc = (a, b) => new Date(a?.created_at || 0) - new Date(b?.created_at || 0);
+  const pickDbProblemForPayload = (p) => {
+    if (p?.id) {
+      return dbProblems.find(dp => dp.id === p.id);
+    }
+
+    const target = normalizeTitle(p?.title);
+    if (!target) return undefined;
+
+    const candidates = dbProblems
+      .filter(dp => normalizeTitle(dp?.title) === target)
+      .sort(byCreatedAtAsc);
+
+    if (candidates.length === 0) return undefined;
+
+    // Critical: if both original + fork exist with the same title, always prefer
+    // the original (non-fork) so forked statements can't leak into contests.
+    const nonFork = candidates.find(dp => !dp?.forked_from_contest_problem);
+    return nonFork || candidates[0];
+  };
+
   const problemRows = problemsArray.map((p, i) => {
-    const dbProb = p.id ? dbProblems.find(dp => dp.id === p.id) : dbProblems.find(dp => dp.title.toLowerCase() === p.title.toLowerCase());
+    const dbProb = pickDbProblemForPayload(p);
     const tc = dbProb ? dbTestCases.filter(t => t.problem_id === dbProb.id) : [];
 
     return {
       contest_id: contestId,
-      problem_title: dbProb ? dbProb.title : p.title,
+      problem_title: dbProb ? dbProb.title : String(p.title || '').trim(),
       problem_url: p.url || '',
       order_index: i,
       scraped_content: dbProb ? dbProb.description : null,
