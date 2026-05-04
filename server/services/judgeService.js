@@ -400,17 +400,34 @@ async function evaluateSubmission(submissionId, contestProblemId, problemTitle, 
     const problemLabel = problem?.title ? `"${problem.title}"` : `"${problemTitle}"`;
     console.log(`[JudgeService] Evaluating submission ${submissionId.slice(0,8)}... against ${testCases.length} test cases for ${problemLabel}`);
 
-    // 3. Execute sequentially to avoid Free Tier Rate Limits (Judge0 CE blocks >1 req/sec)
+    // 3. Execute in parallel with a concurrency limit to avoid hitting rate limits too hard
+    // but much faster than sequential + 1.1s delay.
     let passedCount = 0;
+    const CONCURRENCY_LIMIT = 5;
+    const results = [];
 
-    for (let i = 0; i < testCases.length; i++) {
-      const tc = testCases[i];
+    // Process test cases in chunks to respect rate limits while maintaining speed
+    for (let i = 0; i < testCases.length; i += CONCURRENCY_LIMIT) {
+      const chunk = testCases.slice(i, i + CONCURRENCY_LIMIT);
+      const chunkPromises = chunk.map(async (tc) => {
+        try {
+          const result = await executeOnJudge0(code, languageId, tc.input || '');
+          return { tc, result, error: null };
+        } catch (err) {
+          return { tc, result: null, error: err };
+        }
+      });
+
+      const chunkResults = await Promise.all(chunkPromises);
       
-      try {
-        const result = await executeOnJudge0(code, languageId, tc.input || '');
+      for (const res of chunkResults) {
+        if (res.error) {
+          console.error(`[JudgeService] Judge0 execution failed for TC ${res.tc.order_index}:`, res.error.message);
+          await updateSubmissionStatus(submissionId, 'runtime_error');
+          return;
+        }
 
-        // Add a tiny delay to respect Judge0 public API rate limits (1 req/sec)
-        await new Promise(resolve => setTimeout(resolve, 1100));
+        const { result, tc } = res;
 
         // Check for compilation error
         if (result.statusId === 6) {
@@ -447,10 +464,11 @@ async function evaluateSubmission(submissionId, contestProblemId, problemTitle, 
         }
 
         passedCount++;
-      } catch (err) {
-        console.error(`[JudgeService] Judge0 execution failed for TC ${tc.order_index}:`, err.message);
-        await updateSubmissionStatus(submissionId, 'runtime_error');
-        return;
+      }
+
+      // Add a small delay between chunks if using public API
+      if (i + CONCURRENCY_LIMIT < testCases.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
 

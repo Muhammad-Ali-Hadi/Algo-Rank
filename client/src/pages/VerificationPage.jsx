@@ -32,14 +32,25 @@ export default function VerificationPage() {
   // Automatically send OTP when landing on this page for the first time
   useEffect(() => {
     const autoSendOtp = async () => {
-      // Only do this if they just got redirected from signup
-      if (email && !user?.isVerified && location.state?.email) {
+      // Check if we already auto-sent in this session to avoid spamming
+      const hasAutoSent = sessionStorage.getItem(`otp_sent_${email}`);
+      
+      if (email && !user?.isVerified && !hasAutoSent) {
         try {
-          // We clear the state so it only auto-sends once per session
-          window.history.replaceState({}, document.title);
+          // Mark as sent before the call to prevent race conditions if effect re-runs
+          sessionStorage.setItem(`otp_sent_${email}`, 'true');
+          
+          // If they just came from signup, we might want to clear state
+          if (location.state?.email) {
+            window.history.replaceState({}, document.title);
+          }
+          
           await api.resendVerification(email);
+          console.log('Verification OTP sent automatically');
         } catch (err) {
           console.warn('Auto-OTP sending may have encountered an issue:', err);
+          // Optional: clear the flag so they can try again if they refresh
+          // sessionStorage.removeItem(`otp_sent_${email}`);
         }
       }
     };

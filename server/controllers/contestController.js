@@ -113,7 +113,7 @@ const processProblemsForContest = async (contestId, problemsArray) => {
       contest_id: contestId,
       problem_title: dbProb ? dbProb.title : String(p.title || '').trim(),
       problem_url: p.url || '',
-      order_index: i,
+      order_index: p.order_index !== undefined ? p.order_index : i,
       scraped_content: dbProb ? dbProb.description : null,
       scraped_samples: tc && tc.length > 0 ? tc.map(t => ({ input: t.input, output: t.expected_output })) : null,
       scraped_at: dbProb ? new Date().toISOString() : null
@@ -439,7 +439,10 @@ const updateContest = async (req, res) => {
         await supabaseAdmin.from('contest_problems').delete().in('id', toDelete);
       }
       
-      const newProblems = problems.filter(p => !existingMap.has(p.title.toLowerCase()));
+      const newProblems = problems
+        .map((p, i) => ({ ...p, order_index: i }))
+        .filter(p => !existingMap.has(p.title.toLowerCase()));
+      
       if (newProblems.length > 0) {
         // Find existing database rows to pull `description` accurately for new elements
         await processProblemsForContest(id, newProblems);
@@ -778,6 +781,7 @@ const getLeaderboard = async (req, res) => {
           user: (users || []).find(u => u.id === p.user_id) || null,
           solved: 0,
           penalty: 0,
+          maxSolveTimeSeconds: 0, // Tie-breaker: actual time of last AC submission
           problems: {},
         };
       }
@@ -833,6 +837,8 @@ const getLeaderboard = async (req, res) => {
           userStats[uid].solved++;
           // Penalty: minutes from contest start + 20min per wrong attempt
           userStats[uid].penalty += solveTimeMins + (prob.attempts - 1) * 20;
+          // Tie-breaker: track max solve time in seconds
+          userStats[uid].maxSolveTimeSeconds = Math.max(userStats[uid].maxSolveTimeSeconds, solveTimeSecs);
 
           // Mark first blood
           if (firstBloods[problemKey] === uid) {
@@ -852,9 +858,15 @@ const getLeaderboard = async (req, res) => {
       const normalUsers = leaderboard.filter(u => !u.is_disqualified);
       const disqualifiedUsers = leaderboard.filter(u => u.is_disqualified);
 
-      // Sort normal users by solved (desc), then penalty (asc)
-      const sortedNormal = normalUsers.sort((a, b) => b.solved - a.solved || a.penalty - b.penalty)
-        .map((entry, index) => ({ ...entry, rank: index + 1 }));
+      // Sort normal users by:
+      // 1. Solved problems (desc)
+      // 2. Penalty (asc)
+      // 3. Max solve time in seconds (asc) - Tie-breaker
+      const sortedNormal = normalUsers.sort((a, b) => 
+        b.solved - a.solved || 
+        a.penalty - b.penalty || 
+        a.maxSolveTimeSeconds - b.maxSolveTimeSeconds
+      ).map((entry, index) => ({ ...entry, rank: index + 1 }));
 
       // Disqualified users get rank '-'
       const sortedDisqualified = disqualifiedUsers.map(entry => ({ ...entry, rank: '-' }));
